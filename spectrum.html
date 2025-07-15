@@ -1,0 +1,867 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Visualiseur Audio – Basses Amplifiées</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #0a0a12;
+        }
+        canvas {
+            display: block;
+        }
+        .message {
+            position: absolute;
+            top: 1rem;
+            left: 1rem;
+            color: white;
+            font-family: sans-serif;
+            z-index: 10;
+        }
+        #effect-panel, #config-panel {
+            position: absolute;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            font-size: 0.75rem;
+            font-family: monospace;
+            border-radius: 0.5rem;
+            padding: 1rem;
+            z-index: 20;
+        }
+        #effect-panel {
+            bottom: 1rem;
+            right: 1rem;
+
+        }
+        #config-panel {
+            bottom: 1rem;
+            left: 1rem;
+            max-width: 200px;
+        }
+        #config-panel label {
+            display: flex;
+            flex-direction: column;
+            margin-bottom: 0.5rem;
+        }
+        input[type="range"] {
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
+<div class="message">🎧 Clique pour capturer un onglet avec du son</div>
+<button id="startBtn" class="absolute top-20 left-4 px-4 py-2 bg-pink-600 text-white rounded z-10">
+    Lancer la capture audio
+</button>
+<canvas id="visualizer"></canvas>
+
+<div id="effect-panel" class="flex flex-col gap-1">
+    <label class="flex items-center gap-2"><input type="checkbox" data-effect="bassCircle" checked /> Cercle Basses</label>
+    <label class="flex items-center gap-2"><input type="checkbox" data-effect="backgroundPulse" /> Fond Pulse</label>
+    <label class="flex items-center gap-2"><input type="checkbox" data-effect="dynamicRadius" checked /> Rayon Dynamique</label>
+    <label class="flex items-center gap-2"><input type="checkbox" data-effect="smoothing" checked /> Lissage</label>
+    <label class="flex items-center gap-2"><input type="checkbox" data-effect="rotation"  checked/> Rotation</label>
+    <label class="flex items-center gap-2"><input type="checkbox" data-effect="hardPulseFlash" /> Pulse Fort Rouge</label>
+    <label class="flex items-center gap-2"><input type="checkbox" data-effect="gridWave" checked /> gridWave</label>
+    <label class="flex items-center gap-2"><input type="checkbox" data-effect="grid3D" /> grid3D</label>
+    <label class="flex items-center gap-2"><input type="checkbox" data-effect="shockwave" checked /> Onde de Choc</label>
+    <label class="flex items-center gap-2"><input type="checkbox" data-effect="dnaEffect" checked/> Courbes ADN</label>
+    <label class="flex items-center gap-2"><input type="checkbox" data-effect="eyeCentral"  checked/> Œil Central </label>
+</div>
+<div id="config-panel" class="hidden">
+    <label>Cercle Basses minHz: <span id="circleMinHzVal">41</span><input type="range" id="circleMinHzSlider" min="0" max="300" value="41" /></label>
+    <label>Cercle Basses maxHz: <span id="circleMaxHzVal">150</span><input type="range" id="circleMaxHzSlider" min="0" max="300" value="150" /></label>
+    <label>Fond Basses minHz: <span id="bgMinHzVal">0</span><input type="range" id="bgMinHzSlider" min="0" max="300" value="0" /></label>
+    <label>Fond Basses maxHz: <span id="bgMaxHzVal">40</span><input type="range" id="bgMaxHzSlider" min="0" max="300" value="40" /></label>
+    <hr class="my-3 border-gray-600">
+    <label>Threshold: <span id="thresholdVal">170</span><input type="range" id="thresholdSlider" min="0" max="255" value="170"/></label>
+    <label>Delay: <span id="minDelayVal">150</span>ms<input type="range" id="minDelaySlider" min="50" max="1000" value="150"/></label>
+    <label>Expansion: <span id="expansionVal">1.5</span><input type="range" id="expansionSlider" min="0.5" max="5" step="0.1" value="1.5"/></label>
+    <label>Propagation: <span id="propagationVal">20</span><input type="range" id="propagationSlider" min="1" max="20" step="1" value="20"/></label>
+    <label>Courbure: <span id="pulseWidthVal">12</span><input type="range" id="pulseWidthSlider" min="10" max="100" value="12"/></label>
+    <label>Taille max: <span id="maxRadiusVal">7.5</span><input type="range" id="maxRadiusSlider" min="1" max="10" step="0.1" value="7.5"/></label>
+</div>
+
+<script>
+    const canvas = document.getElementById("visualizer");
+    const ctx = canvas.getContext("2d");
+
+    const startBtn = document.getElementById("startBtn");
+
+    const effects = {};
+    const shockwaves = [];
+    let lastShockTime = 0;
+    let dataArray;
+    let analyser;
+    let audioCtx;
+    const layerRebounds = [0, 0, 0, 0];
+    const scaleFactors = [];
+    const flattenFactors = [];
+    let overdriveActive = false;
+    let overdriveStartTime = 0;
+    let globalFlattenY = 1;
+    let morphTime = 0;
+    let morphProgress = 0; // on la redéclare globalement
+    let grid3DTransition = 0;
+    const fov = 300;
+
+    document.querySelectorAll('#effect-panel input').forEach(input => {
+        const key = input.dataset.effect;
+        effects[key] = input.checked;
+
+        input.addEventListener('change', e => {
+            effects[key] = e.target.checked;
+        });
+    });
+
+    const config = {
+        threshold: 170,
+        minDelay: 150,
+        expansion: 1.5,
+        propagation: 20,
+        pulseWidth: 12,
+        maxRadius: 7.5
+    };
+
+    const sliders = {
+        thresholdSlider: 'threshold',
+        minDelaySlider: 'minDelay',
+        expansionSlider: 'expansion',
+        propagationSlider: 'propagation',
+        pulseWidthSlider: 'pulseWidth',
+        maxRadiusSlider: 'maxRadius'
+    };
+
+    for (const id in sliders) {
+        const key = sliders[id];
+        const input = document.getElementById(id);
+        const label = document.getElementById(key + 'Val');
+        input.addEventListener('input', () => {
+            config[key] = parseFloat(input.value);
+            label.textContent = input.value;
+        });
+    }
+
+    let width = canvas.width = window.innerWidth;
+    let height = canvas.height = window.innerHeight;
+    window.addEventListener("resize", () => {
+        width = canvas.width = window.innerWidth;
+        height = canvas.height = window.innerHeight;
+        setupGrid();
+    });
+
+    const grid = [];
+    let gridRotation = 0;
+
+    const spacing = 40;
+    const activeWaves = [];
+
+    function setupGrid() {
+        grid.length = 0;
+        const radiusMax = Math.sqrt((width / 2) ** 2 + (height / 2) ** 2);
+        const stepAngle = Math.PI * 2 / 60;
+
+        for (let r = spacing; r < radiusMax; r += spacing) {
+            for (let a = 0; a < Math.PI * 2; a += stepAngle) {
+                const x = Math.cos(a) * r;
+                const y = Math.sin(a) * r;
+                grid.push({
+                    x,
+                    y,
+                    z: Math.random() * 1, // profondeur initiale pseudo-aléatoire
+                    pulseBoost: 0,
+                    lastPulse: performance.now() + Math.random() * 1000,
+                    pulseDelay: 2000 + Math.random() * 3000
+                });
+            }
+        }
+    }
+
+    setupGrid();
+
+    function applyLayered3DTransform(ctx, depth, intensity = 1) {
+        const DEV_MODE_SPHERE_ONLY = true;
+
+        const canvas = ctx.canvas;
+        const w = canvas?.width || 800;
+        const h = canvas?.height || 600;
+
+        const reboundMax = 120;
+        const threshold = 10;
+        const normalized = Math.max(0, intensity - threshold) / (255 - threshold);
+        const strength = Math.pow(normalized, 1.5);
+
+        const dampeningFactor = [0.35, 0.6, 1, 1][depth] ?? 1;
+        const targetOffset = strength * reboundMax * (depth / 3) * dampeningFactor;
+
+        layerRebounds[depth] ??= 0;
+        scaleFactors[depth] ??= 1;
+        flattenFactors[depth] ??= 1;
+
+        layerRebounds[depth] += (targetOffset - layerRebounds[depth]) * 0.12;
+        const offsetY = layerRebounds[depth];
+
+        const t = 0.12;
+        const desiredScale = 1 - (depth * 0.03 * strength);
+        const desiredFlatten = globalFlattenY ? 1 - (1 - globalFlattenY) * strength : 1;
+
+        scaleFactors[depth] += (desiredScale - scaleFactors[depth]) * t;
+        flattenFactors[depth] += (desiredFlatten - flattenFactors[depth]) * t;
+
+        // === Oscillations X/Y douces ===
+        const oscStrength = 15;
+        const speed = 1.5;
+        const oscX = Math.sin(performance.now() * 0.001 * speed + depth) * oscStrength;
+        const oscY = Math.cos(performance.now() * 0.001 * speed + depth) * oscStrength;
+
+        const time = performance.now() * 0.001;
+
+        // === Inclinaison orbitale plus marquée ===
+        const pitch = Math.sin(time * 0.3 + depth * 0.2) * 0.25 + 0.15; // autour de X
+        const tilt  = Math.cos(time * 0.25 + depth * 0.1) * 0.22 + 0.1;  // autour de Y
+
+        // === Application des transforms ===
+        ctx.translate(w / 2 + oscX, h / 2 + oscY); // ⛔️ enleve offsetY (gâche le centre)
+        ctx.transform(
+            Math.cos(tilt),            // a
+            Math.sin(pitch),          // b
+            -Math.sin(tilt),          // c
+            Math.cos(pitch),          // d
+            0, 0                      // e, f
+        );
+        ctx.rotate(gridRotation * 2);
+        ctx.scale(scaleFactors[depth], flattenFactors[depth] * scaleFactors[depth]);
+        ctx.translate(-w / 2, -h / 2);
+
+        // === Mode sphère seulement ===
+        if (DEV_MODE_SPHERE_ONLY) {
+            const r = 10;
+            const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, r);
+            gradient.addColorStop(0, "rgba(255,255,255,0.95)");
+            gradient.addColorStop(0.5, "#7e5bef");
+            gradient.addColorStop(1, "rgba(0,0,0,0)");
+            ctx.fillStyle = gradient;
+            ctx.beginPath();
+            ctx.arc(w / 2, h / 2, r, 0, Math.PI * 2);
+            ctx.fill();
+        }
+    }
+
+    function drawGridWave(avg) {
+        if (!effects.gridWave) return;
+
+        const now = performance.now();
+        if (avg > config.threshold) {
+            if (!activeWaves.length || now - activeWaves[activeWaves.length - 1].time > config.minDelay) {
+                activeWaves.push({ time: now, life: 0 });
+            }
+        }
+
+        ctx.save();
+        applyLayered3DTransform(ctx, 0, avg);
+
+        const gradient = ctx.createRadialGradient(width / 2, height / 2, 0, width / 2, height / 2, width / 1.5);
+        gradient.addColorStop(0, 'rgba(255, 0, 85, 0.25)');
+        gradient.addColorStop(1, 'rgba(0, 255, 247, 0.05)');
+        ctx.fillStyle = gradient;
+
+        for (let i = activeWaves.length - 1; i >= 0; i--) {
+            const wave = activeWaves[i];
+            wave.life += config.expansion;
+
+            for (const point of grid) {
+                // 🔁 Interpolation 2D ↔ 3D
+                const rawScale = fov / (fov + point.z * 200); // mode tunnel
+                const scale = 1 + (rawScale - 1) * grid3DTransition;
+
+                const x = width / 2 + point.x * scale;
+                const y = height / 2 + point.y * scale;
+
+                const dx = x - width / 2;
+                const dy = y - height / 2;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                const delay = dist / config.propagation;
+                const pulse = Math.max(0, 1 - Math.abs(wave.life - delay) / config.pulseWidth);
+                let radius = pulse * config.maxRadius;
+
+                // Boost + échelle 3D
+                radius *= 1 + (point.pulseBoost || 0) * 1.5;
+                radius *= scale;
+
+                const shapeRatio = morphProgress;
+
+                if (radius > 0.1) {
+                    if (shapeRatio < 1) {
+                        ctx.beginPath();
+                        ctx.arc(x, y, radius * (1 - shapeRatio), 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                    if (shapeRatio > 0) {
+                        const side = radius * shapeRatio * 2;
+                        ctx.fillRect(x - side / 2, y - side / 2, side, side);
+                    }
+                }
+            }
+
+            if (wave.life > 1000) activeWaves.splice(i, 1);
+        }
+
+        ctx.restore();
+    }
+
+    function drawShockwave(avg, baseRadius) {
+        if (!effects.shockwave || !baseRadius || isNaN(baseRadius)) return;
+
+        const now = performance.now();
+        const bassDeep = getFrequencySlice(dataArray, analyser, 0, 40, audioCtx.sampleRate);
+        const deepAvg = bassDeep.reduce((a, b) => a + b, 0) / bassDeep.length;
+
+        if (deepAvg > config.threshold && now - lastShockTime > 600) {
+            shockwaves.push({
+                radius: baseRadius,
+                alpha: 1,
+                width: 6,
+                frequency: Math.random() * 0.3 + 0.2,
+                amplitude: Math.random() * 6 + 4
+            });
+            lastShockTime = now;
+        }
+
+        ctx.save();
+        applyLayered3DTransform(ctx, 1, avg);
+
+        //const centerOffset = Math.floor(1 + (avg / 255) * 2);
+        const centerOffset = 1; // donc 3 couches max : -1, 0, +1
+
+
+        for (let i = shockwaves.length - 1; i >= 0; i--) {
+            const s = shockwaves[i];
+            s.radius += 4;
+            s.alpha *= 0.96;
+            s.width *= 0.97;
+
+            if (s.alpha <= 0.01) {
+                shockwaves.splice(i, 1);
+                continue;
+            }
+
+            const segments = 48;
+
+            for (let layer = -centerOffset; layer <= centerOffset; layer++) {
+                const offset = layer * 1.5;
+                const alpha = s.alpha * (1 - Math.abs(layer) * 0.15);
+                //const widthLayer = s.width * (1 - Math.abs(layer) * 0.08);
+                const widthLayer = 1;
+
+                const gradient = ctx.createLinearGradient(0, height / 2 - s.radius, 0, height / 2 + s.radius);
+                gradient.addColorStop(0, `rgba(255, 0, 85, ${alpha})`);
+                gradient.addColorStop(0.5, `rgba(0, 255, 247, ${alpha})`);
+                gradient.addColorStop(1, `rgba(255, 239, 0, ${alpha})`);
+
+                const points = [];
+                for (let j = 0; j <= segments; j++) {
+                    const angle = (j / segments) * 2 * Math.PI;
+                    const modRadius = s.radius + Math.sin(j * s.frequency) * s.amplitude;
+                    const x = width / 2 + Math.cos(angle) * modRadius;
+                    const y = height / 2 + Math.sin(angle) * modRadius + offset;
+                    points.push({ x, y });
+                }
+
+                ctx.beginPath();
+                ctx.moveTo(points[0].x, points[0].y);
+                for (let j = 1; j < points.length; j++) {
+                    ctx.lineTo(points[j].x, points[j].y);
+                }
+                ctx.closePath();
+
+                ctx.strokeStyle = gradient;
+                ctx.lineWidth = widthLayer;
+                ctx.stroke();
+            }
+        }
+
+        ctx.restore();
+    }
+    /*
+    function drawDNA(data, baseRadius, avg, bassCircleData) {
+        if (!effects.dnaEffect) return;
+
+        const smoothed = smoothArray(data, 2);
+        const bassSmoothed = smoothArray(bassCircleData, 4);
+        const points = 80;
+        const step = (Math.PI * 2) / points;
+
+        const centerX = width / 2;
+        const centerY = height / 2;
+        const time = performance.now() * 0.001;
+
+        const intense = avg > 235;
+        const layerCount = 3; // ← ici tu gères combien de couches empilées
+        const maxIncline = 0.25; // ← inclinaison max (rad) par couche
+
+        ctx.save();
+        applyLayered3DTransform(ctx, 2, avg);
+
+        const powSoft = x => x * 0.8;
+        const baseRayLength = 25;
+        const boostLength = 15;
+        const bassInfluence = 5;
+
+        for (let layer = 0; layer < layerCount; layer++) {
+            const layerOffset = layer * 10;
+
+            // Inclinaison 3D propre, unique par couche
+            const inclineFactor = layer / (layerCount - 1 || 1); // [0, 1]
+            const rotX = intense ? Math.sin(time * 0.3 + layer) * maxIncline * inclineFactor : 0;
+            const rotY = intense ? Math.cos(time * 0.25 + layer) * maxIncline * (1 - inclineFactor) : 0;
+            const rotZ = intense ? time * 0.05 + layer * 0.1 : 0;
+
+            for (let i = 0; i < points; i++) {
+                const angle = i * step;
+
+                const bassIndex = (i * bassSmoothed.length / points) | 0;
+                const bassVal = powSoft(bassSmoothed[bassIndex] / 255);
+                const rDynamic = baseRadius + bassVal * bassInfluence;
+
+                const index = (i * smoothed.length / points) | 0;
+                const strength = powSoft(smoothed[index] / 255);
+                const outerR = rDynamic + baseRayLength + strength * boostLength + layerOffset;
+
+                let x = Math.cos(angle) * outerR;
+                let y = Math.sin(angle) * outerR;
+                let z = 0;
+
+                if (intense) {
+                    let y1 = y * Math.cos(rotX) - z * Math.sin(rotX);
+                    let z1 = y * Math.sin(rotX) + z * Math.cos(rotX);
+                    y = y1; z = z1;
+
+                    let x1 = x * Math.cos(rotY) + z * Math.sin(rotY);
+                    z1 = -x * Math.sin(rotY) + z * Math.cos(rotY);
+                    x = x1; z = z1;
+
+                    x1 = x * Math.cos(rotZ) - y * Math.sin(rotZ);
+                    y1 = x * Math.sin(rotZ) + y * Math.cos(rotZ);
+                    x = x1; y = y1;
+                }
+
+                const fov = 500;
+                const scale = fov / (fov + z);
+                const screenX = centerX + x * scale;
+                const screenY = centerY + y * scale;
+
+                const xBase = centerX + Math.cos(angle) * rDynamic;
+                const yBase = centerY + Math.sin(angle) * rDynamic;
+
+                ctx.beginPath();
+                ctx.strokeStyle = intense ? "#7e5bef" : "#00ff85";
+                ctx.lineWidth = intense ? 1.4 : 0.7;
+                ctx.shadowBlur = intense ? 6 : 0;
+                ctx.shadowColor = ctx.strokeStyle;
+                ctx.moveTo(xBase, yBase);
+                ctx.lineTo(screenX, screenY);
+                ctx.stroke();
+            }
+        }
+
+        ctx.shadowBlur = 0;
+        ctx.restore();
+    }
+*/
+    function drawDNA(data, baseRadius, avg, bassCircleData) {
+        if (!effects.dnaEffect) return;
+
+        const smoothed = smoothArray(data, 2);
+        const bassSmoothed = smoothArray(bassCircleData, 4);
+        const points = 120;
+        const step = (Math.PI * 2) / points;
+
+        ctx.save();
+        applyLayered3DTransform(ctx, 2, avg);
+
+        const centerOffset = Math.floor(1 + (avg / 255) * 2);
+        const time = performance.now() * 0.001;
+        const twist = Math.sin(time * 0.5) * 0.5; // hélice dynamique
+        const globalRot = time * 0.2; // rotation globale
+        const neonPalette = ["#00f0ff", "#ff00cc", "#00ff85", "#fb0094", "#7e5bef"];
+
+        for (let i = 0; i < points; i++) {
+            const angle = i * step + globalRot;
+
+            const bassIndex = Math.floor((i / points) * bassSmoothed.length);
+            const bassVal = Math.min(Math.pow((bassSmoothed[bassIndex] / 255), 1.25) * 1.2, 0.85);
+            const rDynamic = baseRadius + bassVal * 70;
+
+            const index = Math.floor((i / points) * smoothed.length);
+            const strength = Math.pow(smoothed[index] / 255, 1.2);
+            const dynamicBoost = (avg / 255) * 20;
+            const outerR = rDynamic + strength * (60 + dynamicBoost);
+
+            for (let layer = -centerOffset; layer <= centerOffset; layer++) {
+                const offsetY = layer * 1.5;
+                const zOffset = Math.sin(angle + layer * twist) * 30; // hélice 3D
+                const alpha = 0.35 - Math.abs(layer) * 0.06;
+                const lineBase = 0.8 + (avg / 255) * 1.5;
+                const widthLine = lineBase + Math.abs(layer) * 0.5;
+
+                const x1 = width / 2 + Math.cos(angle) * rDynamic;
+                const y1 = height / 2 + Math.sin(angle) * rDynamic + offsetY + zOffset;
+                const x2 = width / 2 + Math.cos(angle) * outerR;
+                const y2 = height / 2 + Math.sin(angle) * outerR + offsetY + zOffset;
+
+                // 🎨 Couleur dynamique + effet néon aléatoire sur couche centrale
+                if (layer === 0) {
+                    ctx.strokeStyle = `hsla(${(angle * 180 / Math.PI) % 360}, 100%, 65%, ${alpha})`;
+                } else {
+                    ctx.strokeStyle = avg > 220
+                        ? neonPalette[Math.floor(Math.random() * neonPalette.length)]
+                        : `rgba(0, 255, 133, ${alpha})`;
+                }
+
+                ctx.lineWidth = widthLine;
+                ctx.beginPath();
+                ctx.moveTo(x1, y1);
+                ctx.lineTo(x2, y2);
+                ctx.stroke();
+            }
+        }
+
+        ctx.restore();
+    }
+
+
+    function drawBassShape(data, radius, rotation, avg) {
+        if (!effects.bassCircle) return;
+
+        const segments = 512;
+        const step = (Math.PI * 2) / segments;
+        const smoothed = smoothArray(data, 4);
+        const points = [];
+
+        // 👇 Compensation de l'oscillation Y trop marquée
+        const localOffsetY = -(layerRebounds[3] || 0) * 0.25; // ajustable
+
+        for (let i = 0; i < segments; i++) {
+            const index = Math.floor((i / segments) * smoothed.length);
+            const val = Math.min(Math.pow((smoothed[index] / 255), 1.25) * 1.2, 0.85);
+            const r = radius + val * 70;
+            const angle = i * step + (effects.rotation ? rotation : 0);
+            const x = width / 2 + Math.cos(angle) * r;
+            const y = height / 2 + Math.sin(angle) * r + localOffsetY;
+            points.push({ x, y });
+        }
+
+        ctx.save();
+        applyLayered3DTransform(ctx, 3, avg);
+
+        const centerOffset = Math.floor(1 + (avg / 255) * 2);
+
+        for (let layer = -centerOffset; layer <= centerOffset; layer++) {
+            const offset = layer * 1.5;
+            const alpha = 0.2 + (0.1 * (centerOffset - Math.abs(layer)));
+            const layerPoints = points.map(p => ({ x: p.x, y: p.y + offset }));
+
+            ctx.beginPath();
+            ctx.moveTo(layerPoints[0].x, layerPoints[0].y);
+            for (let i = 1; i < layerPoints.length - 2; i++) {
+                const xc = (layerPoints[i].x + layerPoints[i + 1].x) / 2;
+                const yc = (layerPoints[i].y + layerPoints[i + 1].y) / 2;
+                ctx.quadraticCurveTo(layerPoints[i].x, layerPoints[i].y, xc, yc);
+            }
+            ctx.closePath();
+
+            const gradient = ctx.createLinearGradient(0, 0, width, height);
+            gradient.addColorStop(0, `rgba(255, 0, 85, ${alpha})`);
+            gradient.addColorStop(1, `rgba(255, 239, 0, ${alpha})`);
+            //ctx.strokeStyle = gradient;
+            const neonPalette = ["#00f0ff", "#ff00cc", "#00ff85", "#fb0094", "#7e5bef"];
+            ctx.strokeStyle = avg > 220
+                ? neonPalette[Math.floor(Math.random() * neonPalette.length)]
+                : "#fb0094";
+            ctx.lineWidth = 4 + (centerOffset - Math.abs(layer));
+            ctx.stroke();
+        }
+
+        ctx.fillStyle = "rgba(10, 10, 18, 0.8)";
+        ctx.fill();
+
+        ctx.restore();
+    }
+    let eyeBlink = 1; // 1 = ouvert, 0 = fermé
+    let blinkTimer = 0;
+    function drawEyeCentral(avg) {
+        if (!effects.eyeCentral) return;
+
+        const now = performance.now();
+
+        // Gestion du clignement (toutes les 3-7s)
+        if (now > blinkTimer) {
+            blinkTimer = now + 3000 + Math.random() * 4000;
+            eyeBlink = 0;
+        }
+
+        // Interpolation d’ouverture (douce)
+        eyeBlink += (1 - eyeBlink) * 0.2;
+
+        const cx = width / 2;
+        const cy = height / 2;
+
+        ctx.save();
+        applyLayered3DTransform(ctx, 2, avg);
+
+        const openness = 0.6 * eyeBlink + 0.1 + (avg / 255) * 0.2;
+        const irisSize = 40 + (avg / 255) * 20;
+        let pupilSize = 6 + Math.pow(avg / 255, 1.5) * 6;
+
+// Si pic fort → la pupille se dilate plus brutalement
+        if (avg > 210) {
+            pupilSize += (avg - 210) * 0.3; // modifie l’intensité ici si tu veux plus ou moins de grossissement
+        }
+        const t = now * 0.001;
+        const irisX = cx + Math.sin(t * 0.8) * 8;
+        const irisY = cy + Math.cos(t * 0.6) * 5;
+
+        // Sclère (fond blanc cassé avec glow)
+        ctx.beginPath();
+        ctx.ellipse(cx, cy, 100, 100 * openness, 0, 0, Math.PI * 2);
+        ctx.fillStyle = "rgba(245, 245, 255, 0.04)";
+        ctx.shadowColor = "#fb0094";
+        ctx.shadowBlur = 0;
+        ctx.fill();
+
+        // Iris en dégradé radial
+        const irisGradient = ctx.createRadialGradient(irisX, irisY, 5, irisX, irisY, irisSize);
+        irisGradient.addColorStop(0, "#fb0094");
+        irisGradient.addColorStop(1, "#7e5bef");
+        ctx.beginPath();
+        ctx.arc(irisX, irisY, irisSize, 0, Math.PI * 2);
+        ctx.fillStyle = irisGradient;
+        ctx.shadowBlur = 0;
+        ctx.shadowColor = "#7e5bef";
+        ctx.fill();
+
+        // Pupille noire
+        ctx.beginPath();
+        ctx.arc(irisX, irisY, pupilSize, 0, Math.PI * 2);
+        ctx.fillStyle = "#000";
+        ctx.shadowBlur = 0;
+        ctx.fill();
+
+        // Reflet stylisé
+        ctx.beginPath();
+        ctx.arc(irisX - 8, irisY - 8, 4, 0, Math.PI * 2);
+        ctx.fillStyle = "rgba(255,255,255,0.15)";
+        ctx.fill();
+
+        ctx.restore();
+    }
+    function applyPsyAberration() {
+        const imageData = ctx.getImageData(0, 0, width, height);
+        const data = imageData.data;
+
+        const offsetR = Math.floor(Math.random() * 6) + 2; // décalage rouge
+        const offsetG = -Math.floor(Math.random() * 6) - 2; // vert
+        const offsetB = Math.floor(Math.random() * 6) + 2;  // bleu
+
+        const copy = new Uint8ClampedArray(data); // copie pour lire l'image d'origine
+
+        for (let y = 0; y < height; y++) {
+            for (let x = 0; x < width; x++) {
+                const i = (y * width + x) * 4;
+
+                const rIndex = i + offsetR * 4;
+                const gIndex = i + offsetG * 4;
+                const bIndex = i + offsetB * 4;
+
+                if (rIndex < data.length) data[i]     = copy[rIndex];     // R
+                if (gIndex + 1 < data.length) data[i + 1] = copy[gIndex + 1]; // G
+                if (bIndex + 2 < data.length) data[i + 2] = copy[bIndex + 2]; // B
+                // A inchangé
+            }
+        }
+
+        ctx.putImageData(imageData, 0, 0);
+    }
+    function boostSaturationImage() {
+        const imageData = ctx.getImageData(0, 0, width, height);
+        const d = imageData.data;
+
+        for (let i = 0; i < d.length; i += 4) {
+            let r = d[i], g = d[i + 1], b = d[i + 2];
+
+            // Boost saturé (style harsh)
+            const max = Math.max(r, g, b);
+            r = (r + max) / 2;
+            g = (g + max) / 2;
+            b = (b + max) / 2;
+
+            d[i]     = Math.min(255, r);
+            d[i + 1] = Math.min(255, g);
+            d[i + 2] = Math.min(255, b);
+        }
+
+        ctx.putImageData(imageData, 0, 0);
+    }
+    function updateBackground(avg, threshold = 180) {
+        if (!effects.backgroundPulse) return;
+        const base = 10; // valeur minimale pour R, G, B
+        let intensity = Math.max(0, (avg - threshold) / (255 - threshold));
+        intensity = Math.min(intensity, 1);
+        const color = Math.round(base + intensity * (255 - base));
+        document.body.style.backgroundColor = `rgb(${color}, ${color}, ${color})`;
+    }
+    function getFrequencySlice(data, analyser, minHz, maxHz, sampleRate) {
+        const binHz = sampleRate / analyser.fftSize;
+        const start = Math.floor(minHz / binHz);
+        const end = Math.ceil(maxHz / binHz);
+        return data.slice(start, end);
+    }
+    function smoothArray(arr, windowSize = 3) {
+        if (!effects.smoothing) return arr;
+        return arr.map((_, i) => {
+            let sum = 0, count = 0;
+            for (let j = -windowSize; j <= windowSize; j++) {
+                const k = i + j;
+                if (k >= 0 && k < arr.length) {
+                    sum += arr[k];
+                    count++;
+                }
+            }
+            return sum / count;
+        });
+    }
+
+    startBtn.addEventListener("click", async () => {
+        try {
+            const stream = await navigator.mediaDevices.getDisplayMedia({ audio: true, video: true });
+            startBtn.remove();
+            document.querySelector(".message").innerText = "✅ Audio capturé, enjoy !";
+
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            analyser = audioCtx.createAnalyser();
+            dataArray = new Uint8Array(analyser.frequencyBinCount);
+
+            analyser.fftSize = 512;
+            const source = audioCtx.createMediaStreamSource(stream);
+            source.connect(analyser);
+
+            dataArray = new Uint8Array(analyser.frequencyBinCount);
+
+
+            //const bassConfig = { circle: { minHz: 41, maxHz: 150 }, background: { minHz: 0, maxHz: 40 } };
+            let rot = 0;
+
+            function animate() {
+                requestAnimationFrame(animate);
+                analyser.getByteFrequencyData(dataArray);
+                ctx.clearRect(0, 0, width, height);
+
+                gridRotation += 0.002;
+
+                const bassCircle = getFrequencySlice(dataArray, analyser, bassConfig.circle.minHz, bassConfig.circle.maxHz, audioCtx.sampleRate);
+                const bassBG = getFrequencySlice(dataArray, analyser, bassConfig.background.minHz, bassConfig.background.maxHz, audioCtx.sampleRate);
+                const avgBG = bassBG.reduce((a, b) => a + b, 0) / bassBG.length;
+                const avgCircle = bassCircle.reduce((a, b) => a + b, 0) / bassCircle.length;
+
+                morphTime += 0.01;
+                morphProgress = (Math.sin(morphTime) + 1) / 2;
+
+                // 💡 Transition douce vers 3D
+                const target = effects.grid3D ? 1 : 0;
+                grid3DTransition += (target - grid3DTransition) * 0.1;
+
+                const now = performance.now();
+
+                for (const point of grid) {
+                    // 🔁 pulse aléatoire
+                    const elapsed = now - point.lastPulse;
+                    if (elapsed > point.pulseDelay) {
+                        point.pulseBoost = 1;
+                        point.lastPulse = now;
+                        point.pulseDelay = 2000 + Math.random() * 3000;
+                    }
+
+                    // 🔁 Z scroll uniquement si 3D activé
+                    if (effects.grid3D) {
+                        point.z -= 0.005;
+                        if (point.z < 0.1) point.z = 1;
+                    }
+
+                    // 🔁 diminution progressive du boost
+                    point.pulseBoost *= 0.9;
+                    if (point.pulseBoost < 0.01) point.pulseBoost = 0;
+                }
+
+                // 🔁 Global flatten (aplatissement Y dynamique)
+                globalFlattenY = 0.55 + Math.min(avgCircle / 255, 1) * 0.2;
+
+                // === Dessins principaux ===
+                drawGridWave(avgBG);
+                updateBackground(avgBG);
+
+                const baseRadius = effects.dynamicRadius
+                    ? 80 + Math.pow(avgCircle / 255, 1.5) * 80
+                    : 120;
+
+                const bassShock = getFrequencySlice(dataArray, analyser, 0, 40, audioCtx.sampleRate);
+                const avgShock = bassShock.reduce((a, b) => a + b, 0) / bassShock.length;
+
+                const dnaFreqs = getFrequencySlice(dataArray, analyser, 0, 180, audioCtx.sampleRate);
+
+                drawDNA(dnaFreqs, baseRadius, avgCircle, bassCircle);
+                drawShockwave(avgShock, baseRadius);
+                drawBassShape(bassCircle, baseRadius, rot, avgCircle);
+                drawEyeCentral(avgCircle);
+
+                if (effects.rotation) rot += 0.0012;
+
+                if (effects.hardPulseFlash && avgBG > 200) {
+                    ctx.save();
+                    ctx.fillStyle = "rgba(255, 255, 255, 0.05)";
+                    ctx.fillRect(0, 0, width, height);
+                    ctx.restore();
+                }
+
+                if (avgCircle > 220) {
+                    applyPsyAberration();
+                    boostSaturationImage(); // à activer si besoin
+                }
+            }
+
+
+            animate();
+        } catch (err) {
+            document.querySelector(".message").innerText = "🚫 Capture refusée ou échouée.";
+            console.error(err);
+        }
+    });
+
+    const bassConfig = {
+        circle: { minHz: 41, maxHz: 150 },
+        background: { minHz: 0, maxHz: 40 }
+    };
+
+    document.getElementById('circleMinHzSlider').addEventListener('input', (e) => {
+        bassConfig.circle.minHz = parseInt(e.target.value);
+        document.getElementById('circleMinHzVal').textContent = e.target.value;
+    });
+    document.getElementById('circleMaxHzSlider').addEventListener('input', (e) => {
+        bassConfig.circle.maxHz = parseInt(e.target.value);
+        document.getElementById('circleMaxHzVal').textContent = e.target.value;
+    });
+    document.getElementById('bgMinHzSlider').addEventListener('input', (e) => {
+        bassConfig.background.minHz = parseInt(e.target.value);
+        document.getElementById('bgMinHzVal').textContent = e.target.value;
+    });
+    document.getElementById('bgMaxHzSlider').addEventListener('input', (e) => {
+        bassConfig.background.maxHz = parseInt(e.target.value);
+        document.getElementById('bgMaxHzVal').textContent = e.target.value;
+    });
+
+</script>
+</body>
+</html>
