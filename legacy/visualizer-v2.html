@@ -1,0 +1,869 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Visualiseur Audio – Basses Amplifiées (v2)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body{ margin:0; overflow:hidden; background:#0a0a12; }
+        canvas{ display:block; }
+        .message{
+            position:absolute; top:1rem; left:1rem; color:#fff; font-family:sans-serif; z-index:10;
+        }
+        #startBtn{
+            position:absolute; top:5rem; left:1rem; z-index:10;
+        }
+        #effect-panel, #config-panel{
+            position:absolute; background:rgba(0,0,0,.7); color:#fff; font: 12px/1.3 monospace;
+            border-radius:.5rem; padding:1rem; z-index:20;
+        }
+        #effect-panel{ bottom:1rem; right:1rem; }
+        #config-panel{ bottom:1rem; left:1rem; max-width:200px; }
+        #config-panel label{ display:flex; flex-direction:column; margin-bottom:.5rem; }
+        input[type="range"]{ width:100%; }
+    </style>
+</head>
+<body>
+<div class="message">🎧 Clique pour capturer un onglet avec du son</div>
+<button id="startBtn" class="px-4 py-2 bg-pink-600 text-white rounded">Lancer la capture audio</button>
+<canvas id="visualizer"></canvas>
+
+<div id="effect-panel" class="flex flex-col gap-1">
+    <label class="flex items-center gap-2"><input type="checkbox" data-effect="bassCircle" checked /> Cercle Basses</label>
+    <label class="flex items-center gap-2"><input type="checkbox" data-effect="backgroundPulse"  /> Fond Pulse</label>
+    <label class="flex items-center gap-2"><input type="checkbox" data-effect="dynamicRadius" checked /> Rayon Dynamique</label>
+    <label class="flex items-center gap-2"><input type="checkbox" data-effect="smoothing" checked /> Lissage</label>
+    <label class="flex items-center gap-2"><input type="checkbox" data-effect="rotation" checked /> Rotation</label>
+    <label class="flex items-center gap-2"><input type="checkbox" data-effect="hardPulseFlash" /> Pulse Fort Rouge</label>
+    <label class="flex items-center gap-2"><input type="checkbox" data-effect="gridWave" checked /> gridWave</label>
+    <label class="flex items-center gap-2"><input type="checkbox" data-effect="grid3D" /> grid3D</label>
+    <label class="flex items-center gap-2"><input type="checkbox" data-effect="shockwave" checked /> Onde de Choc</label>
+    <label class="flex items-center gap-2"><input type="checkbox" data-effect="dnaEffect" checked /> Courbes ADN</label>
+    <label class="flex items-center gap-2"><input type="checkbox" data-effect="eyeCentral" checked /> Œil Central</label>
+</div>
+
+<div id="config-panel" class="hidden" >
+    <label>Cercle Basses minHz: <span id="circleMinHzVal">41</span><input type="range" id="circleMinHzSlider" min="0" max="300" value="41" /></label>
+    <label>Cercle Basses maxHz: <span id="circleMaxHzVal">150</span><input type="range" id="circleMaxHzSlider" min="0" max="300" value="150" /></label>
+    <label>Fond Basses minHz: <span id="bgMinHzVal">0</span><input type="range" id="bgMinHzSlider" min="0" max="300" value="0" /></label>
+    <label>Fond Basses maxHz: <span id="bgMaxHzVal">40</span><input type="range" id="bgMaxHzSlider" min="0" max="300" value="40" /></label>
+    <hr class="my-3 border-gray-600">
+    <label>Threshold: <span id="thresholdVal">170</span><input type="range" id="thresholdSlider" min="0" max="255" value="170"/></label>
+    <label>Delay: <span id="minDelayVal">150</span>ms<input type="range" id="minDelaySlider" min="50" max="1000" value="150"/></label>
+    <label>Expansion: <span id="expansionVal">1.5</span><input type="range" id="expansionSlider" min="0.5" max="5" step="0.1" value="1.5"/></label>
+    <label>Propagation: <span id="propagationVal">20</span><input type="range" id="propagationSlider" min="1" max="20" step="1" value="20"/></label>
+    <label>Courbure: <span id="pulseWidthVal">12</span><input type="range" id="pulseWidthSlider" min="10" max="100" value="12"/></label>
+    <label>Taille max: <span id="maxRadiusVal">7.5</span><input type="range" id="maxRadiusSlider" min="1" max="10" step="0.1" value="7.5"/></label>
+</div>
+
+<script>
+    // === Canvas & UI
+    const canvas = document.getElementById("visualizer");
+    const ctx = canvas.getContext("2d", { alpha: false, desynchronized: true, willReadFrequently: true });
+    ctx.imageSmoothingEnabled = false;
+
+    const startBtn = document.getElementById("startBtn");
+
+    // === État global
+    const effects = {};
+    const shockwaves = [];
+    let lastShockTime = 0;
+    let dataArray, analyser, audioCtx;
+
+    const layerRebounds = [0,0,0,0];
+    const scaleFactors = [];
+    const flattenFactors = [];
+    let globalFlattenY = 1;
+    let morphTime = 0;
+    let morphProgress = 0;
+    let grid3DTransition = 0;
+    const fov = 300;
+    let eyeBlink = 1;
+    let blinkTimer = 0;
+    let frameId = 0;
+
+    // === LUT trigonométrique pour éviter Math.cos/sin dans les boucles
+    const Trig = {
+        cache: new Map(),
+        get(n){
+            let hit = this.cache.get(n);
+            if (!hit){
+                const step = (Math.PI * 2) / n;
+                const c = new Float32Array(n), s = new Float32Array(n);
+                for (let i=0;i<n;i++){ const a = i*step; c[i]=Math.cos(a); s[i]=Math.sin(a); }
+                hit = { c, s }; this.cache.set(n, hit);
+            }
+            return hit;
+        }
+    };
+
+    document.querySelectorAll('#effect-panel input').forEach(input => {
+        const key = input.dataset.effect;
+        effects[key] = input.checked;
+        input.addEventListener('change', e => effects[key] = e.target.checked);
+    });
+
+    const config = {
+        threshold: 195,   // seuil plus haut → moins de triggers
+        minDelay: 280,    // délai plus long entre vagues
+        expansion: 1.2,   // expansion modérée
+        propagation: 16,  // propagation plus courte
+        pulseWidth: 9,    // courbure plus serrée
+        maxRadius: 5.0    // taille max réduite
+    };
+
+    const bassConfig = {
+        circle: { minHz: 55,  maxHz: 140 },
+        background: { minHz: 0, maxHz: 50 }
+    };
+
+    // === Helpers sliders ===
+    function throttle(fn, ms=80){
+        let t=0, lastArgs=null, pending=false;
+        return (...args)=>{
+            const now = performance.now();
+            lastArgs = args;
+            if (!pending && now - t >= ms) {
+                t = now; fn(...lastArgs);
+            } else if (!pending) {
+                pending = true;
+                setTimeout(()=>{
+                    pending = false;
+                    t = performance.now();
+                    fn(...lastArgs);
+                }, ms);
+            }
+        };
+    }
+
+    function bindSlider(id, key, onUpdate) {
+        const input = document.getElementById(id);
+        const label = document.getElementById(key + 'Val');
+        if (!input || !label) return;
+        const update = throttle((v)=>{
+            label.textContent = v;
+            onUpdate(parseFloat(v));
+        }, 80);
+        input.addEventListener('input', e => update(e.target.value));
+        input.addEventListener('change', e => {
+            label.textContent = e.target.value;
+            onUpdate(parseFloat(e.target.value));
+        });
+    }
+
+    // map sliders → config
+    bindSlider('thresholdSlider',  'threshold',   v => config.threshold = v);
+    bindSlider('minDelaySlider',   'minDelay',    v => config.minDelay = v);
+    bindSlider('expansionSlider',  'expansion',   v => config.expansion = v);
+    bindSlider('propagationSlider','propagation', v => config.propagation = v);
+    bindSlider('pulseWidthSlider', 'pulseWidth',  v => config.pulseWidth = v);
+    bindSlider('maxRadiusSlider',  'maxRadius',   v => config.maxRadius = v);
+
+    // map sliders → bassConfig
+    bindSlider('circleMinHzSlider', 'circleMinHz', v => bassConfig.circle.minHz = v);
+    bindSlider('circleMaxHzSlider', 'circleMaxHz', v => bassConfig.circle.maxHz = v);
+    bindSlider('bgMinHzSlider',     'bgMinHz',     v => bassConfig.background.minHz = v);
+    bindSlider('bgMaxHzSlider',     'bgMaxHz',     v => bassConfig.background.maxHz = v);
+
+
+
+    const sliders = {
+        thresholdSlider: 'threshold',
+        minDelaySlider: 'minDelay',
+        expansionSlider: 'expansion',
+        propagationSlider: 'propagation',
+        pulseWidthSlider: 'pulseWidth',
+        maxRadiusSlider: 'maxRadius'
+    };
+    for (const id in sliders) {
+        const key = sliders[id];
+        const input = document.getElementById(id);
+        const label = document.getElementById(key + 'Val');
+        if (!input) continue;
+        input.addEventListener('input', () => { config[key] = parseFloat(input.value); label.textContent = input.value; });
+    }
+
+    // Résolution logique réduite (50% → 1/4 des pixels à dessiner)
+    const scaleFactor = 1; // 0.5 = moitié, 0.75 = 75% de la taille
+    let width = canvas.width = Math.floor(window.innerWidth * scaleFactor);
+    let height = canvas.height = Math.floor(window.innerHeight * scaleFactor);
+
+    // Mais on upscale en CSS pour remplir l’écran
+    canvas.style.width = "100%";
+    canvas.style.height = "100%";
+
+    window.addEventListener("resize", () => {
+        width = canvas.width = Math.floor(window.innerWidth * scaleFactor);
+        height = canvas.height = Math.floor(window.innerHeight * scaleFactor);
+        canvas.style.width = "100%";
+        canvas.style.height = "100%";
+        setupGrid();
+        setupGradients();
+    });
+
+    document.addEventListener("fullscreenchange", () => {
+        if (document.fullscreenElement) {
+            // en plein écran → désactive les post FX
+            Quality.postFx = false;
+        } else {
+            // hors plein écran → réactive
+            Quality.postFx = true;
+        }
+    });
+
+    // === Grille & gradients
+    const grid = [];
+    let gridRotation = 0;
+    const spacing = 40;
+    const activeWaves = [];
+    let globalGradients = {};
+
+    function setupGrid() {
+        grid.length = 0;
+        const radiusMax = Math.sqrt((width/2)**2 + (height/2)**2);
+        const stepAngle = Math.PI*2/60;
+        for (let r = spacing; r < radiusMax; r += spacing) {
+            for (let a = 0; a < Math.PI*2; a += stepAngle) {
+                const x = Math.cos(a) * r;
+                const y = Math.sin(a) * r;
+                const dist = Math.sqrt(x*x + y*y);
+
+                grid.push({
+                    x, y,
+                    dist, // ✅ distance pré-calculée
+                    z: Math.random(),
+                    pulseBoost: 0,
+                    lastPulse: performance.now() + Math.random()*1000,
+                    pulseDelay: 2000 + Math.random()*3000
+                });
+            }
+        }
+    }
+    function setupGradients() {
+        globalGradients.circle = ctx.createLinearGradient(0,0,width,height);
+        globalGradients.circle.addColorStop(0, "rgba(255,0,85,0.2)");
+        globalGradients.circle.addColorStop(1, "rgba(255,239,0,0.2)");
+
+        globalGradients.bg = ctx.createRadialGradient(width/2, height/2, 0, width/2, height/2, width/1.5);
+        globalGradients.bg.addColorStop(0, "rgba(255, 0, 85, 0.25)");
+        globalGradients.bg.addColorStop(1, "rgba(0, 255, 247, 0.05)");
+    }
+    setupGrid();
+    setupGradients();
+
+    // === Metrics & perf helpers (globaux)
+    function rmsOf(arr){ let s=0; for (let i=0;i<arr.length;i++){ const v=arr[i]; s+=v*v; } return Math.sqrt(s/(arr.length||1)); }
+    function maxOf(arr){ let m=0; for (let i=0;i<arr.length;i++){ if(arr[i]>m) m=arr[i]; } return m; }
+    function bandEnergy(arr){ const pk = maxOf(arr); const rm = rmsOf(arr); return pk*0.6 + rm*0.4; }
+
+    class AdaptiveGate {
+        constructor(alpha=0.06){ this.mu=0; this.s2=1; this.alpha=alpha; }
+        update(x){ this.mu=(1-this.alpha)*this.mu+this.alpha*x; const d=x-this.mu; this.s2=(1-this.alpha)*this.s2+this.alpha*d*d; return {mean:this.mu, std:Math.sqrt(Math.max(this.s2,1e-6))}; }
+        above(x, z=2.3){ const {mean,std}=this.update(x); return x > mean + z*std; }
+    }
+    const gateFlash = new AdaptiveGate();
+
+    function getFrequencySlice(data, analyser, minHz, maxHz, sampleRate) {
+        const binHz = sampleRate / analyser.fftSize;
+        const start = Math.max(0, Math.floor(minHz / binHz));
+        const end   = Math.min(data.length, Math.ceil(maxHz / binHz));
+        return data.subarray(start, end); // vue sans copie
+    }
+
+    // Lissage vers buffer réutilisable
+    function smoothArrayInto(src, dst, windowSize=3){
+        const n = src.length;
+        if (dst.length !== n) dst = new Float32Array(n);
+        for (let i=0;i<n;i++){
+            let sum=0, count=0;
+            for (let j=-windowSize;j<=windowSize;j++){
+                const k=i+j; if (k>=0 && k<n){ sum += src[k]; count++; }
+            }
+            dst[i] = sum / count;
+        }
+        return dst;
+    }
+
+    // Buffers lissés globaux
+    let smoothBassCircle = new Float32Array(0);
+    let smoothDNA        = new Float32Array(0);
+    let postFxLimiter    = 0;
+    // === Cache transform par frame (global)
+    let _lastTransformKey = "";
+    let _lastTransformFrame = -1;
+
+    function applyLayered3DTransformCached(ctx, depth, intensity) {
+        const key = depth + "|" + (intensity | 0);
+
+        if (_lastTransformFrame === frameId && _lastTransformKey === key) {
+            return;
+        }
+
+        _lastTransformFrame = frameId;
+        _lastTransformKey = key;
+
+        applyLayered3DTransform(ctx, depth, intensity);
+    }
+
+    // === Transforms 3D (inchangé)
+    function applyLayered3DTransform(ctx, depth, intensity=1){
+        const DEV_MODE_SPHERE_ONLY = true;
+        const w = ctx.canvas?.width || 800;
+        const h = ctx.canvas?.height || 600;
+
+        const reboundMax = 120;
+        const threshold = 10;
+        const normalized = Math.max(0, intensity - threshold) / (255 - threshold);
+        const strength = Math.pow(normalized, 1.5);
+
+        const dampeningFactor = [0.35, 0.6, 1, 1][depth] ?? 1;
+        const targetOffset = strength * reboundMax * (depth/3) * dampeningFactor;
+
+        layerRebounds[depth] ??= 0;
+        scaleFactors[depth] ??= 1;
+        flattenFactors[depth] ??= 1;
+
+        layerRebounds[depth] += (targetOffset - layerRebounds[depth]) * 0.12;
+
+        const t = 0.12;
+        const desiredScale = 1 - (depth * 0.03 * strength);
+        const desiredFlatten = globalFlattenY ? 1 - (1 - globalFlattenY) * strength : 1;
+
+        scaleFactors[depth] += (desiredScale - scaleFactors[depth]) * t;
+        flattenFactors[depth] += (desiredFlatten - flattenFactors[depth]) * t;
+
+        // Oscillations
+        const oscStrength = 15, speed = 1.5;
+        const oscX = Math.sin(performance.now()*0.001*speed + depth) * oscStrength;
+        const oscY = Math.cos(performance.now()*0.001*speed + depth) * oscStrength;
+
+        const time = performance.now()*0.001;
+        const pitch = Math.sin(time*0.3 + depth*0.2)*0.25 + 0.15;
+        const tilt  = Math.cos(time*0.25 + depth*0.1)*0.22 + 0.1;
+
+        ctx.translate(w/2 + oscX, h/2 + oscY);
+        ctx.transform(Math.cos(tilt), Math.sin(pitch), -Math.sin(tilt), Math.cos(pitch), 0, 0);
+        ctx.rotate(gridRotation*2);
+        ctx.scale(scaleFactors[depth], flattenFactors[depth]*scaleFactors[depth]);
+        ctx.translate(-w/2, -h/2);
+
+        if (DEV_MODE_SPHERE_ONLY) {
+            const r = 10;
+            const gradient = ctx.createRadialGradient(0,0,0,0,0,r);
+            gradient.addColorStop(0,"rgba(255,255,255,0.95)");
+            gradient.addColorStop(0.5,"#7e5bef");
+            gradient.addColorStop(1,"rgba(0,0,0,0)");
+            ctx.fillStyle = gradient;
+            ctx.beginPath();
+            ctx.arc(w/2,h/2,r,0,Math.PI*2);
+            ctx.fill();
+        }
+    }
+
+    // === Effets
+    function drawGridWave(energyBG) {
+        if (!effects.gridWave) return;
+
+        const now = performance.now();
+
+        // Déclenchement des vagues
+        if (energyBG > config.threshold) {
+            if (!activeWaves.length || now - activeWaves[activeWaves.length - 1].time > config.minDelay) {
+                activeWaves.push({ time: now, life: 0 });
+            }
+        }
+
+        ctx.save();
+        applyLayered3DTransformCached(ctx, 0, energyBG);
+        ctx.fillStyle = globalGradients.bg;
+
+        // Facteur de densité invisible (moins de points quand calme)
+        const energyFactor = Math.min(1, energyBG / 180);
+
+        for (let i = activeWaves.length - 1; i >= 0; i--) {
+            const wave = activeWaves[i];
+            wave.life += config.expansion;
+
+            ctx.beginPath(); // 🔥 UN SEUL PATH PAR VAGUE
+
+            for (const point of grid) {
+
+                // Densité adaptative invisible
+                if (Math.random() > energyFactor) continue;
+
+                const rawScale = fov / (fov + point.z * 200);
+                const scale = 1 + (rawScale - 1) * grid3DTransition;
+
+                const x = width / 2 + point.x * scale;
+                const y = height / 2 + point.y * scale;
+
+                const delay = point.dist / config.propagation;
+                const pulse = Math.max(0, 1 - Math.abs(wave.life - delay) / config.pulseWidth);
+
+                let radius = pulse * config.maxRadius;
+                radius *= 1 + (point.pulseBoost || 0) * 1.5;
+                radius *= scale;
+
+                if (radius < 0.1) continue;
+
+                const shapeRatio = morphProgress;
+
+                // 🔥 Trop petit → carré 1px (invisible mais rapide)
+                if (radius < 1.2) {
+                    ctx.rect(x, y, 1, 1);
+                    continue;
+                }
+
+                // Cercle batché
+                if (shapeRatio < 1) {
+                    ctx.moveTo(x + radius, y);
+                    ctx.arc(x, y, radius * (1 - shapeRatio), 0, Math.PI * 2);
+                }
+
+                // Carré morph
+                if (shapeRatio > 0) {
+                    const side = radius * shapeRatio * 2;
+                    ctx.rect(x - side / 2, y - side / 2, side, side);
+                }
+            }
+
+            ctx.fill(); // 🔥 UN SEUL FILL GPU
+
+            if (wave.life > 1000) activeWaves.splice(i, 1);
+        }
+
+        ctx.restore();
+    }
+
+    function drawShockwave(avg, baseRadius) {
+        if (!effects.shockwave || !baseRadius || isNaN(baseRadius)) return;
+
+        const now = performance.now();
+
+        // Déclenchement basé sur le grave (0–40 Hz)
+        const bassDeep = getFrequencySlice(dataArray, analyser, 0, 40, audioCtx.sampleRate);
+        const deepAvg = bassDeep.length ? (bassDeep.reduce((a, b) => a + b, 0) / bassDeep.length) : 0;
+
+        if (deepAvg > config.threshold && now - lastShockTime > 600) {
+            shockwaves.push({
+                radius: baseRadius,
+                alpha: 1,
+                width: 6,
+                frequency: Math.random() * 0.3 + 0.2,
+                amplitude: Math.random() * 6 + 4
+            });
+            lastShockTime = now;
+        }
+
+        ctx.save();
+        applyLayered3DTransformCached(ctx, 1, avg);
+
+        const centerOffset = 1; // -1, 0, +1
+        const segments = (typeof Quality !== "undefined" && Quality.shockSegments) ? Quality.shockSegments : 48;
+        const { c: cosS, s: sinS } = Trig.get(segments + 1); // +1 car on ferme la forme
+
+        for (let i = shockwaves.length - 1; i >= 0; i--) {
+            const s = shockwaves[i];
+
+            // Mise à jour de l'onde
+            s.radius += 4;
+            s.alpha *= 0.96;
+            s.width *= 0.97;
+
+            if (s.alpha <= 0.01) { shockwaves.splice(i, 1); continue; }
+
+            for (let layer = -centerOffset; layer <= centerOffset; layer++) {
+                const offset = layer * 1.5;
+                const alpha = s.alpha * (1 - Math.abs(layer) * 0.15);
+                const widthLayer = 1;
+
+                // Gradient dynamique selon le rayon actuel
+                const gradient = ctx.createLinearGradient(0, height / 2 - s.radius, 0, height / 2 + s.radius);
+                gradient.addColorStop(0, `rgba(255, 0, 85, ${alpha})`);
+                gradient.addColorStop(0.5, `rgba(0, 255, 247, ${alpha})`);
+                gradient.addColorStop(1, `rgba(255, 239, 0, ${alpha})`);
+
+                // Tracé direct (pas de points[])
+                ctx.beginPath();
+                for (let j = 0; j <= segments; j++) {
+                    const ci = cosS[j], si = sinS[j];
+                    const modRadius = s.radius + Math.sin(j * s.frequency) * s.amplitude;
+                    const x = width / 2 + ci * modRadius;
+                    const y = height / 2 + si * modRadius + offset;
+                    if (j === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+                }
+                ctx.closePath();
+
+                ctx.strokeStyle = gradient;
+                ctx.lineWidth = widthLayer;
+                ctx.stroke();
+            }
+        }
+
+        ctx.restore();
+    }
+
+    function drawDNA(smoothedDNA, baseRadius, avg, smoothedBassCircle) {
+        if (!effects.dnaEffect) return;
+
+        const smoothed = smoothedDNA;            // déjà lissé (Float32Array)
+        const bassSmoothed = smoothedBassCircle; // déjà lissé (Float32Array)
+
+        // --- densité dynamique + LUT cos/sin
+        const points = (typeof Quality !== "undefined" && Quality.dnaPoints) ? Quality.dnaPoints : 120;
+        const { c: cosL, s: sinL } = Trig.get(points);
+
+        ctx.save();
+        applyLayered3DTransformCached(ctx, 2, avg);
+
+        const centerOffset = Math.floor(1 + (avg / 255) * 2);
+
+        const t = performance.now() * 0.001;
+        const twist = Math.sin(t * 0.5) * 0.5;   // hélice 3D
+        const globalRot = t * 0.2;               // rotation globale
+        const cosR = Math.cos(globalRot), sinR = Math.sin(globalRot);
+
+        const neonPalette = ["#00f0ff", "#ff00cc", "#00ff85", "#fb0094", "#7e5bef"];
+        const TAU = Math.PI * 2;
+
+        for (let i = 0; i < points; i++) {
+            // base angle + rotation via LUT
+            const ci = cosL[i], si = sinL[i];
+            const cosA = ci * cosR - si * sinR;
+            const sinA = si * cosR + ci * sinR;
+
+            // indexation des spectres lissés
+            const bassIndex = (i * bassSmoothed.length / points) | 0;
+            const index     = (i * smoothed.length      / points) | 0;
+
+            const bassVal = Math.min(Math.pow((bassSmoothed[bassIndex] / 255), 1.25) * 1.2, 0.85);
+            const rDynamic = baseRadius + bassVal * 70;
+
+            const strength = Math.pow(smoothed[index] / 255, 1.2);
+            const dynamicBoost = (avg / 255) * 20;
+            const outerR = rDynamic + strength * (60 + dynamicBoost);
+
+            // z-offset hélicoïdal (utilise l'angle de base non-roté + twist par couche)
+            const baseAngle = (i / points) * TAU;
+
+            for (let layer = -centerOffset; layer <= centerOffset; layer++) {
+                const offsetY = layer * 1.5;
+                const zOffset = Math.sin(baseAngle + layer * twist) * 30; // hélice 3D
+                const alpha = 0.35 - Math.abs(layer) * 0.06;
+                const lineBase = 0.8 + (avg / 255) * 1.5;
+                const widthLine = lineBase + Math.abs(layer) * 0.5;
+
+                // points projetés (utilise cosA/sinA déjà rotatés)
+                const x1 = width / 2 + cosA * rDynamic;
+                const y1 = height / 2 + sinA * rDynamic + offsetY + zOffset;
+                const x2 = width / 2 + cosA * outerR;
+                const y2 = height / 2 + sinA * outerR + offsetY + zOffset;
+
+                // couleur
+                if (layer === 0) {
+                    // teinte continue le long de l'hélice
+                    const hue = (baseAngle * 180 / Math.PI) % 360;
+                    ctx.strokeStyle = `hsla(${hue}, 100%, 65%, ${alpha})`;
+                } else {
+                    ctx.strokeStyle = avg > 220
+                        ? neonPalette[(Math.random() * neonPalette.length) | 0]
+                        : `rgba(0, 255, 133, ${alpha})`;
+                }
+
+                ctx.lineWidth = widthLine;
+                ctx.beginPath();
+                ctx.moveTo(x1, y1);
+                ctx.lineTo(x2, y2);
+                ctx.stroke();
+            }
+        }
+
+        ctx.restore();
+    }
+
+    function drawBassShape(smoothedData, radius, rotation, avg){
+        if (!effects.bassCircle) return;
+
+        const segments = Quality?.bassSegments || 512;
+        const { c:cosL, s:sinL } = Trig.get(segments);
+
+        const cosR = Math.cos(effects.rotation ? rotation : 0);
+        const sinR = Math.sin(effects.rotation ? rotation : 0);
+
+        const localOffsetY = -(layerRebounds[3] || 0) * 0.25;
+
+        ctx.save();
+        applyLayered3DTransformCached(ctx, 3, avg);
+
+        const centerOffset = Math.floor(1 + (avg/255)*2);
+
+        for (let layer=-centerOffset; layer<=centerOffset; layer++){
+            const offset = layer*1.5;
+            ctx.beginPath();
+
+            for (let i=0;i<segments;i++){
+                // angle i*step + rotation → produit par addition d’angles: (cos, sin) via LUT
+                const cosA = cosL[i]*cosR - sinL[i]*sinR;
+                const sinA = sinL[i]*cosR + cosL[i]*sinR;
+
+                const idx = (i * smoothedData.length / segments) | 0;
+                const val = Math.min(Math.pow((smoothedData[idx]/255), 1.25)*1.2, 0.85);
+                const r = radius + val*70;
+
+                const x = width/2 + cosA * r;
+                const y = height/2 + sinA * r + localOffsetY + offset;
+
+                if (i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+            }
+            ctx.closePath();
+
+            const neonPalette = ["#00f0ff","#ff00cc","#00ff85","#fb0094","#7e5bef"];
+            ctx.strokeStyle = avg > 220 ? neonPalette[(Math.random()*neonPalette.length)|0] : "#fb0094";
+            ctx.lineWidth = 4 + (centerOffset - Math.abs(layer));
+            ctx.stroke();
+        }
+
+        ctx.fillStyle = "rgba(10,10,18,0.8)";
+        ctx.fill();
+
+        ctx.restore();
+    }
+
+
+
+    function drawEyeCentral(avg){
+        if (!effects.eyeCentral) return;
+
+        const now = performance.now();
+        if (now > blinkTimer) { blinkTimer = now + 3000 + Math.random()*4000; eyeBlink = 0; }
+        eyeBlink += (1 - eyeBlink) * 0.2;
+
+        const cx = width/2, cy = height/2;
+
+        ctx.save();
+        applyLayered3DTransformCached(ctx, 2, avg);
+
+        const openness = 0.6*eyeBlink + 0.1 + (avg/255)*0.2;
+        const irisSize = 40 + (avg/255)*20;
+        let pupilSize = 6 + Math.pow(avg/255, 1.5)*6;
+        if (avg > 210) pupilSize += (avg-210)*0.3;
+
+        const t = now*0.001;
+        const irisX = cx + Math.sin(t*0.8)*8;
+        const irisY = cy + Math.cos(t*0.6)*5;
+
+        ctx.beginPath();
+        ctx.ellipse(cx, cy, 100, 100*openness, 0, 0, Math.PI*2);
+        ctx.fillStyle = "rgba(245,245,255,0.04)";
+        ctx.shadowBlur = 0;
+        ctx.fill();
+
+        const irisGradient = ctx.createRadialGradient(irisX,irisY,5, irisX,irisY,irisSize);
+        irisGradient.addColorStop(0, "#fb0094");
+        irisGradient.addColorStop(1, "#7e5bef");
+        ctx.beginPath();
+        ctx.arc(irisX, irisY, irisSize, 0, Math.PI*2);
+        ctx.fillStyle = irisGradient;
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.arc(irisX, irisY, pupilSize, 0, Math.PI*2);
+        ctx.fillStyle = "#000";
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.arc(irisX - 8, irisY - 8, 4, 0, Math.PI*2);
+        ctx.fillStyle = "rgba(255,255,255,0.15)";
+        ctx.fill();
+
+        ctx.restore();
+    }
+
+/*
+    function applyPsyAberration(){
+        const imageData = ctx.getImageData(0,0,width,height);
+        const data = imageData.data;
+        const offsetR = Math.floor(Math.random()*6)+2;
+        const offsetG = -Math.floor(Math.random()*6)-2;
+        const offsetB = Math.floor(Math.random()*6)+2;
+        const copy = new Uint8ClampedArray(data);
+
+        for (let y=0;y<height;y++){
+            for (let x=0;x<width;x++){
+                const i = (y*width + x)*4;
+                const rIndex = i + offsetR*4;
+                const gIndex = i + offsetG*4;
+                const bIndex = i + offsetB*4;
+                if (rIndex < data.length) data[i]   = copy[rIndex];
+                if (gIndex+1 < data.length) data[i+1] = copy[gIndex+1];
+                if (bIndex+2 < data.length) data[i+2] = copy[bIndex+2];
+            }
+        }
+        ctx.putImageData(imageData, 0, 0);
+    }
+*/
+    function applyPsyAberrationFast(strengthPx = 2) {
+        // Duplique la frame en 3 passes décalées → effet de dédoublement RGB "cheap"
+        // (pas de séparation stricte par canal, mais visuellement proche et BEAUCOUP plus rapide)
+        ctx.save();
+        ctx.globalCompositeOperation = "lighter";
+        ctx.globalAlpha = 0.22;
+        ctx.drawImage(canvas,  strengthPx, 0);
+        ctx.drawImage(canvas, -strengthPx, 0);
+        ctx.drawImage(canvas,  0, strengthPx);
+        ctx.restore();
+    }
+
+
+    function boostSaturationFast(amount = 1.25) {
+        ctx.save();
+        ctx.filter = `saturate(${amount})`;
+        ctx.drawImage(canvas, 0, 0); // réécrit la frame avec saturation
+        ctx.restore();
+    }
+
+
+    function updateBackground(energy, threshold=180){
+        if (!effects.backgroundPulse) return;
+        const base = 10;
+        let intensity = Math.max(0, (energy - threshold) / (255 - threshold));
+        intensity = Math.min(intensity, 1);
+        const color = Math.round(base + intensity * (255-base));
+        document.body.style.backgroundColor = `rgb(${color}, ${color}, ${color})`;
+    }
+    // Defaults si le Quality Manager n'est pas chargé
+    window.Quality = window.Quality || { gridStride: 1, bassSegments: 512, dnaPoints: 120, shockSegments: 48, postFx: true };
+
+    // === Launch
+    startBtn.addEventListener("click", async () => {
+        try{
+            const stream = await navigator.mediaDevices.getDisplayMedia({ audio:true, video:true });
+            startBtn.remove();
+            document.querySelector(".message").innerText = "✅ Audio capturé, enjoy !";
+
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            analyser = audioCtx.createAnalyser();
+            analyser.fftSize = 1024;                 // 4096 (ou 8192)
+            analyser.smoothingTimeConstant = 0.6;
+
+            const source = audioCtx.createMediaStreamSource(stream);
+
+            // Pré-EQ léger (stabilise la lecture du grave)
+            const lowpass = audioCtx.createBiquadFilter(); lowpass.type="lowpass"; lowpass.frequency.value = 120;
+            const bandpass = audioCtx.createBiquadFilter(); bandpass.type="bandpass"; bandpass.frequency.value=95; bandpass.Q=0.9;
+
+            source.connect(lowpass);  lowpass.connect(analyser);
+            source.connect(bandpass); // cercle lit via analyser (même dataArray)
+
+            dataArray = new Uint8Array(analyser.frequencyBinCount);
+
+
+            // Sliders config live
+            const cMin = document.getElementById('circleMinHzSlider');
+            const cMax = document.getElementById('circleMaxHzSlider');
+            const bMin = document.getElementById('bgMinHzSlider');
+            const bMax = document.getElementById('bgMaxHzSlider');
+            cMin && cMin.addEventListener('input', e => { bassConfig.circle.minHz = parseInt(e.target.value); document.getElementById('circleMinHzVal').textContent = e.target.value; });
+            cMax && cMax.addEventListener('input', e => { bassConfig.circle.maxHz = parseInt(e.target.value); document.getElementById('circleMaxHzVal').textContent = e.target.value; });
+            bMin && bMin.addEventListener('input', e => { bassConfig.background.minHz = parseInt(e.target.value); document.getElementById('bgMinHzVal').textContent = e.target.value; });
+            bMax && bMax.addEventListener('input', e => { bassConfig.background.maxHz = parseInt(e.target.value); document.getElementById('bgMaxHzVal').textContent = e.target.value; });
+
+            let rot = 0;
+            let lastTime = performance.now();
+            let fpsLimiter = 0;
+            const MAX_DT = 1/30;
+            let frameId = 0;
+            function animate(){
+                frameId++;
+
+                requestAnimationFrame(animate);
+
+                const now = performance.now();
+                let dt = (now - lastTime)/1000; lastTime = now;
+                dt = Math.min(dt, MAX_DT);
+                fpsLimiter += dt; if (fpsLimiter < 1/60) return; fpsLimiter = 0;
+
+                analyser.getByteFrequencyData(dataArray);
+                ctx.clearRect(0,0,width,height);
+
+                gridRotation += 0.002 * (dt / (1/60));
+
+                // Slices (vues sans copie)
+                const bassCircle = getFrequencySlice(dataArray, analyser, bassConfig.circle.minHz, bassConfig.circle.maxHz, audioCtx.sampleRate);
+                const bassBG     = getFrequencySlice(dataArray, analyser, bassConfig.background.minHz, bassConfig.background.maxHz, audioCtx.sampleRate);
+                const dnaFreqs   = getFrequencySlice(dataArray, analyser, 0, 180, audioCtx.sampleRate);
+
+                // Énergie robuste (indépendant du fftSize)
+                const energyBG     = bandEnergy(bassBG);
+                const energyCircle = bandEnergy(bassCircle);
+
+                // Buffers lissés (une seule fois par frame)
+                if (smoothBassCircle.length !== bassCircle.length) smoothBassCircle = new Float32Array(bassCircle.length);
+                if (smoothDNA.length        !== dnaFreqs.length)   smoothDNA        = new Float32Array(dnaFreqs.length);
+                smoothArrayInto(bassCircle, smoothBassCircle, 4);
+                smoothArrayInto(dnaFreqs,   smoothDNA,        2);
+
+                // Morph & transition 3D
+                morphTime += 0.01;
+                morphProgress = (Math.sin(morphTime) + 1) / 2;
+                grid3DTransition += ((effects.grid3D?1:0) - grid3DTransition) * 0.1;
+
+                // Update points
+                for (let gi = 0; gi < grid.length; gi += (Quality?.gridStride || 1)) {
+                    const point = grid[gi];
+                    const elapsed = now - point.lastPulse;
+                    if (elapsed > point.pulseDelay) {
+                        point.pulseBoost = 1; point.lastPulse = now; point.pulseDelay = 2000 + Math.random()*3000;
+                    }
+                    if (effects.grid3D) { point.z -= 0.005; if (point.z < 0.1) point.z = 1; }
+                    point.pulseBoost *= 0.9; if (point.pulseBoost < 0.01) point.pulseBoost = 0;
+                }
+
+                // Aplatissement global guidé par l'énergie cercle
+                globalFlattenY = 0.55 + Math.min(energyCircle/255, 1) * 0.2;
+
+                // === Rendu
+                drawGridWave(energyBG);
+                updateBackground(energyBG);
+
+                // Flash adaptatif
+                if (effects.hardPulseFlash && gateFlash.above(energyBG, 2.3)) {
+                    ctx.save(); ctx.fillStyle="rgba(255,255,255,0.05)"; ctx.fillRect(0,0,width,height); ctx.restore();
+                }
+
+                const baseRadius = effects.dynamicRadius
+                    ? 80 + Math.pow(energyCircle/255, 1.5) * 80
+                    : 120;
+
+                // Shockwave: simple moyenne 0–40Hz ok
+                const bassShock = getFrequencySlice(dataArray, analyser, 0, 40, audioCtx.sampleRate);
+                const avgShock = bassShock.length ? (bassShock.reduce((a,b)=>a+b,0)/bassShock.length) : 0;
+
+                drawDNA(smoothDNA, baseRadius, energyCircle, smoothBassCircle);
+                drawShockwave(avgShock, baseRadius);
+                drawBassShape(smoothBassCircle, baseRadius, rot, energyCircle);
+                drawEyeCentral(energyCircle);
+
+                if (effects.rotation) rot += 0.0012;
+
+                // Post-FX coûteux limités (≈15 fps)
+                postFxLimiter += dt;
+                if (Quality.postFx && energyCircle > 220 && postFxLimiter > (1/15)) {
+                    applyPsyAberrationFast();
+                    boostSaturationFast();
+                    postFxLimiter = 0;
+                }
+
+            }
+            animate();
+
+        } catch(err){
+            document.querySelector(".message").innerText = "🚫 Capture refusée ou échouée.";
+            console.error(err);
+        }
+    });
+
+</script>
+</body>
+</html>

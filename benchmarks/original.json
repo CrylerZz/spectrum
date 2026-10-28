@@ -1,0 +1,271 @@
+[
+  {
+    "name": "1080p moderate",
+    "w": 1920,
+    "h": 1080,
+    "level": 170,
+    "canvas": [
+      1920,
+      1080
+    ],
+    "grid": 1647,
+    "waves": 0,
+    "renderFPS": 38.05037144414785,
+    "rafFPS": 60.00160539412425,
+    "interval": {
+      "n": 189,
+      "mean": 26.280952380920844,
+      "p95": 33.69999998807907
+    },
+    "functions": {
+      "smoothArrayInto": {
+        "n": 380,
+        "mean": 0.0018421053102141932,
+        "p95": 0
+      },
+      "drawGridWave": {
+        "n": 190,
+        "mean": 0.04789473665388007,
+        "p95": 0.10000002384185791
+      },
+      "drawDNA": {
+        "n": 190,
+        "mean": 0.5252631578006243,
+        "p95": 0.9000000059604645
+      },
+      "drawShockwave": {
+        "n": 190,
+        "mean": 0.02578947324501841,
+        "p95": 0.09999999403953552
+      },
+      "drawBassShape": {
+        "n": 190,
+        "mean": 0.27263157916696446,
+        "p95": 0.4000000059604645
+      },
+      "drawEyeCentral": {
+        "n": 190,
+        "mean": 0.02578947481356169,
+        "p95": 0.10000002384185791
+      }
+    },
+    "context": {
+      "alpha": false,
+      "colorSpace": "srgb",
+      "colorType": "unorm8",
+      "desynchronized": true,
+      "toneMapping": {
+        "mode": "standard"
+      },
+      "willReadFrequently": true
+    },
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.0.0 Safari/537.36"
+  },
+  {
+    "name": "1080p strong",
+    "w": 1920,
+    "h": 1080,
+    "level": 240,
+    "canvas": [
+      1920,
+      1080
+    ],
+    "grid": 1647,
+    "waves": 47,
+    "renderFPS": 28.144097780603136,
+    "rafFPS": 28.188865398167724,
+    "interval": {
+      "n": 140,
+      "mean": 35.531428571471146,
+      "p95": 65.69999998807907
+    },
+    "functions": {
+      "smoothArrayInto": {
+        "n": 282,
+        "mean": 0.0014184398431304499,
+        "p95": 0
+      },
+      "drawGridWave": {
+        "n": 141,
+        "mean": 2.745390071513805,
+        "p95": 3.199999988079071
+      },
+      "drawDNA": {
+        "n": 141,
+        "mean": 0.2886524830304139,
+        "p95": 0.4000000059604645
+      },
+      "drawShockwave": {
+        "n": 141,
+        "mean": 0.13049645352025405,
+        "p95": 0.20000001788139343
+      },
+      "drawBassShape": {
+        "n": 141,
+        "mean": 0.1702127659574468,
+        "p95": 0.29999998211860657
+      },
+      "drawEyeCentral": {
+        "n": 141,
+        "mean": 0.02198581577192807,
+        "p95": 0.10000002384185791
+      },
+      "applyPsyAberrationFast": {
+        "n": 47,
+        "mean": 33.527659574721724,
+        "p95": 35.30000001192093
+      },
+      "boostSaturationFast": {
+        "n": 47,
+        "mean": 8.1361702109905,
+        "p95": 8.599999994039536
+      }
+    },
+    "context": {
+      "alpha": false,
+      "colorSpace": "srgb",
+      "colorType": "unorm8",
+      "desynchronized": true,
+      "toneMapping": {
+        "mode": "standard"
+      },
+      "willReadFrequently": true
+    },
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.0.0 Safari/537.36"
+  },
+  {
+    "name": "1080p strong no postFX",
+    "w": 1920,
+    "h": 1080,
+    "level": 240,
+    "noPost": true,
+    "canvas": [
+      1920,
+      1080
+    ],
+    "grid": 1647,
+    "waves": 52,
+    "renderFPS": 49.10508488182271,
+    "rafFPS": 59.80213120346772,
+    "interval": {
+      "n": 245,
+      "mean": 20.364489795845383,
+      "p95": 31.099999994039536
+    },
+    "functions": {
+      "smoothArrayInto": {
+        "n": 492,
+        "mean": 0.002032520385777078,
+        "p95": 0
+      },
+      "drawGridWave": {
+        "n": 246,
+        "mean": 2.808536584420902,
+        "p95": 4.4000000059604645
+      },
+      "drawDNA": {
+        "n": 246,
+        "mean": 0.30731707241961626,
+        "p95": 0.4000000059604645
+      },
+      "drawShockwave": {
+        "n": 246,
+        "mean": 0.09471544805096417,
+        "p95": 0.20000001788139343
+      },
+      "drawBassShape": {
+        "n": 246,
+        "mean": 0.18170731726700698,
+        "p95": 0.30000001192092896
+      },
+      "drawEyeCentral": {
+        "n": 246,
+        "mean": 0.026016259338797594,
+        "p95": 0.09999999403953552
+      }
+    },
+    "context": {
+      "alpha": false,
+      "colorSpace": "srgb",
+      "colorType": "unorm8",
+      "desynchronized": true,
+      "toneMapping": {
+        "mode": "standard"
+      },
+      "willReadFrequently": true
+    },
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.0.0 Safari/537.36"
+  },
+  {
+    "name": "4K strong",
+    "w": 3840,
+    "h": 2160,
+    "level": 240,
+    "canvas": [
+      3840,
+      2160
+    ],
+    "grid": 3355,
+    "waves": 40,
+    "renderFPS": 6.878152486581973,
+    "rafFPS": 6.875286470269596,
+    "interval": {
+      "n": 33,
+      "mean": 145.38787878733692,
+      "p95": 257.5
+    },
+    "functions": {
+      "smoothArrayInto": {
+        "n": 68,
+        "mean": 0,
+        "p95": 0
+      },
+      "drawGridWave": {
+        "n": 34,
+        "mean": 7.238235292189262,
+        "p95": 8.100000023841858
+      },
+      "drawDNA": {
+        "n": 34,
+        "mean": 0.2970588259837207,
+        "p95": 0.4000000059604645
+      },
+      "drawShockwave": {
+        "n": 34,
+        "mean": 0.3588235246784547,
+        "p95": 0.5
+      },
+      "drawBassShape": {
+        "n": 34,
+        "mean": 0.18529412238036885,
+        "p95": 0.30000001192092896
+      },
+      "drawEyeCentral": {
+        "n": 34,
+        "mean": 0.011764705181121826,
+        "p95": 0.09999999403953552
+      },
+      "applyPsyAberrationFast": {
+        "n": 12,
+        "mean": 141.6500000009934,
+        "p95": 147.09999999403954
+      },
+      "boostSaturationFast": {
+        "n": 12,
+        "mean": 30.533333331346512,
+        "p95": 31.5
+      }
+    },
+    "context": {
+      "alpha": false,
+      "colorSpace": "srgb",
+      "colorType": "unorm8",
+      "desynchronized": true,
+      "toneMapping": {
+        "mode": "standard"
+      },
+      "willReadFrequently": true
+    },
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.0.0 Safari/537.36"
+  }
+]
