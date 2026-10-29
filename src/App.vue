@@ -2,7 +2,7 @@
 import { computed, nextTick, onMounted, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { AudioEngine, audioError } from './audio/AudioEngine'
 import { Renderer } from './visuals/Renderer'
-import { defaults, cleanSettings, scenes, palettes } from './visuals/scenes'
+import { defaults, startupMix, cleanSettings, scenes, palettes } from './visuals/scenes'
 
 const outputId = new URLSearchParams(location.search).get('output')
 const isOutput = !!outputId
@@ -10,6 +10,7 @@ let restored = defaults
 try {
   restored = cleanSettings(JSON.parse(localStorage.getItem('spectrum.settings.v1')))
 } catch {}
+restored = { ...restored, ...startupMix }
 const settings = reactive({ ...restored })
 const engineSettings = { ...restored }
 const canvas = ref(null),
@@ -81,7 +82,18 @@ const audio = new AudioEngine((reason) => {
   }
   if (reason === 'file-ended') playing.value = false
 })
-const currentScene = computed(() => scenes[settings.scene])
+const graphicsLoading = reactive({
+  active: true,
+  completed: 0,
+  total: scenes.length,
+  failed: 0,
+  current: '',
+  waiting: true,
+})
+const currentScene = computed(
+  () => scenes.find((scene) => scene.id === settings.scene) || scenes[0],
+)
+const isOrbital = computed(() => settings.scene === 0 || settings.scene === 6)
 const sourceTitle = computed(
   () =>
     ({
@@ -98,9 +110,10 @@ const formatTime = (value) =>
     : '0:00'
 const controls = [
   { key: 'sensitivity', name: 'Sensibilité audio', min: 0.3, max: 3, unit: '×' },
+  { key: 'bassGain', name: 'Réponse des basses', min: 0, max: 2, unit: '×' },
   { key: 'intensity', name: 'Intensité', min: 0.2, max: 2, unit: '×' },
   { key: 'speed', name: 'Mouvement', min: 0, max: 2, unit: '×' },
-  { key: 'detail', name: 'Détail ADN', min: 0.2, max: 1, unit: '%' },
+  { key: 'detail', name: 'Détail / densité', min: 0.2, max: 1, unit: '%' },
   { key: 'glow', name: 'Halo lumineux', min: 0, max: 1, unit: '%' },
   { key: 'orbitalDepth', name: 'Relief 3D · Orbital', min: 0, max: 1.5, unit: '%', orbital: true },
   {
@@ -112,6 +125,90 @@ const controls = [
     orbital: true,
   },
 ]
+const raveControls = [
+  { key: 'raveEnergy', name: 'Énergie', max: 2 },
+  { key: 'raveDepth', name: 'Coup de sub · profondeur', max: 2 },
+  { key: 'ravePsy', name: 'Psychédélisme', max: 2 },
+  { key: 'raveFlash', name: 'Flashs sur les frappes', max: 1 },
+]
+const motionChannels = [
+  { key: 'rotation', name: 'Rotation' },
+  { key: 'deformation', name: 'Déformation' },
+  { key: 'travel', name: 'Déplacement' },
+]
+const motionControls = [
+  { key: 'motionStrength', name: 'Force des impulsions', min: 0, max: 3 },
+  { key: 'motionInertia', name: 'Inertie', min: 0, max: 1 },
+  { key: 'motionThreshold', name: 'Seuil de déclenchement', min: 0.02, max: 0.8 },
+]
+const livePads = [
+  { action: 'strike', name: 'Frappe', key: 'J', hint: 'Coup de sub' },
+  { action: 'flash', name: 'Flash', key: 'K', hint: 'Éclair bref' },
+  { action: 'explosion', name: 'Explosion', key: 'L', hint: 'Dispersion' },
+]
+const liveActive = ref('')
+const boostHeld = ref(false)
+const boostInputs = new Set()
+let liveFeedbackTimer
+function syncLive() {
+  if (!isOutput && outputOpen.value && renderer)
+    channel?.postMessage({
+      type: 'live',
+      settings: { ...engineSettings },
+      motion: renderer.motion.snapshot(),
+    })
+}
+function triggerLive(action) {
+  if (!settings.liveMode || settings.frozen || settings.blackout || isOutput) return
+  renderer?.motion.trigger(action, engineSettings)
+  liveActive.value = action
+  clearTimeout(liveFeedbackTimer)
+  liveFeedbackTimer = setTimeout(() => (liveActive.value = ''), 140)
+  syncLive()
+}
+function setBoostInput(input, pressed) {
+  if (pressed && settings.liveMode && !settings.frozen && !settings.blackout && !isOutput)
+    boostInputs.add(input)
+  else boostInputs.delete(input)
+  boostHeld.value = boostInputs.size > 0
+  renderer?.motion.setBoost(boostHeld.value, engineSettings)
+  syncLive()
+}
+function releaseLive() {
+  boostInputs.clear()
+  boostHeld.value = false
+  renderer?.motion.setBoost(false, engineSettings)
+  liveActive.value = ''
+  clearTimeout(liveFeedbackTimer)
+  syncLive()
+}
+function boostPointer(event) {
+  if (event.button !== 0) return
+  event.preventDefault()
+  event.currentTarget.setPointerCapture(event.pointerId)
+  setBoostInput(`pointer-${event.pointerId}`, true)
+}
+function releaseBoostPointer(event) {
+  setBoostInput(`pointer-${event.pointerId}`, false)
+}
+function releaseBoostKeyboard() {
+  setBoostInput('button-space', false)
+  setBoostInput('button-enter', false)
+}
+function liveKeyup(event) {
+  if (event.key.toLowerCase() === 'u') setBoostInput('keyboard', false)
+}
+function liveVisibility() {
+  if (document.hidden) releaseLive()
+}
+watch(
+  () => settings.liveMode,
+  (enabled) => {
+    renderer?.motion.setLiveMode(enabled)
+    releaseLive()
+  },
+)
+watch(() => [settings.frozen, settings.blackout, settings.scene, help.value], releaseLive)
 const layers = [
   { key: 'ring', label: 'Cercle' },
   { key: 'dna', label: 'ADN' },
@@ -297,7 +394,7 @@ function persistPresets() {
 function applyPreset() {
   const p = savedPresets.value.find((p) => p.name === presetSelection.value)
   if (p) {
-    Object.assign(settings, cleanSettings(p.settings))
+    Object.assign(settings, cleanSettings(p.settings), { liveMode: settings.liveMode })
     autoTime = 0
   }
 }
@@ -337,7 +434,7 @@ async function importPreset(event) {
     const preset = JSON.parse(await file.text())
     if (preset.version !== 1 || !preset.settings || typeof preset.settings !== 'object')
       throw new Error('Format de preset non reconnu.')
-    Object.assign(settings, cleanSettings(preset.settings))
+    Object.assign(settings, cleanSettings(preset.settings), { liveMode: settings.liveMode })
     presetName.value = String(preset.name || 'Preset importé').slice(0, 40)
     toast('Preset chargé. Enregistre-le pour le retrouver.')
   } catch (e) {
@@ -384,7 +481,17 @@ function keydown(event) {
     fullscreen()
   }
   if (isOutput) return
-  if (/^[1-6]$/.test(key)) selectScene(Number(key) - 1)
+  if (settings.liveMode) {
+    const pad = livePads.find((pad) => pad.key.toLowerCase() === key)
+    if (pad || key === 'u') {
+      event.preventDefault()
+      if (pad) triggerLive(pad.action)
+      else setBoostInput('keyboard', true)
+      return
+    }
+  }
+  if (/^[1-9]$/.test(key)) selectScene(Number(key) - 1)
+  if (key === '0') selectScene(9)
   if (key === ' ') {
     event.preventDefault()
     settings.frozen = !settings.frozen
@@ -393,7 +500,9 @@ function keydown(event) {
   if (key === 'a') settings.auto = !settings.auto
   if (key === 'arrowright') {
     event.preventDefault()
-    selectScene((settings.scene + 1) % scenes.length)
+    selectScene(
+      scenes[(scenes.findIndex((scene) => scene.id === settings.scene) + 1) % scenes.length].id,
+    )
   }
   if (key === '?') help.value = true
 }
@@ -409,8 +518,9 @@ function processFrame(now) {
     values = remoteAudio
     spectrum = remoteSpectrum
     outputConnected.value = now - lastPacket < 3000 && lastPacket > 0
+    if (!outputConnected.value) renderer?.motion.setBoost(false, engineSettings)
   } else {
-    values = audio.update(dt, now / 1000, engineSettings.sensitivity)
+    values = audio.update(dt, now / 1000, engineSettings.sensitivity, engineSettings.bassGain)
     spectrum = audio.features.spectrum
     if (
       settings.auto &&
@@ -422,7 +532,10 @@ function processFrame(now) {
       )
     ) {
       autoTime += dt
-      if (autoTime >= settings.autoInterval) selectScene((settings.scene + 1) % scenes.length)
+      if (autoTime >= settings.autoInterval)
+        selectScene(
+          scenes[(scenes.findIndex((scene) => scene.id === settings.scene) + 1) % scenes.length].id,
+        )
     }
     if (projection?.closed && outputOpen.value) {
       outputOpen.value = false
@@ -431,6 +544,14 @@ function processFrame(now) {
         renderer.resize()
       }
     }
+    if (document.hidden && renderer) {
+      renderer.motion.update(dt, values, engineSettings)
+      if (!engineSettings.frozen)
+        renderer.time +=
+          Math.min(dt, 0.1) *
+          engineSettings.speed *
+          (engineSettings.liveMode ? 1 + renderer.motion.boost * 2.5 : 1)
+    }
     if (outputOpen.value && now - sendTime >= 1000 / 30) {
       channel.postMessage({
         type: 'frame',
@@ -438,6 +559,7 @@ function processFrame(now) {
         audio: { ...values },
         spectrum,
         time: renderer?.time || 0,
+        motion: renderer?.motion.snapshot(),
       })
       sendTime = now
     }
@@ -469,19 +591,29 @@ onMounted(() => {
       canvas.value,
       engineSettings,
       (message) => (graphicsError.value = message),
+      (progress) => Object.assign(graphicsLoading, progress),
     )
   } catch (e) {
     graphicsError.value = e.message
+    graphicsLoading.active = false
   }
   channel = new BroadcastChannel('spectrum-' + channelId)
   if (isOutput)
     channel.onmessage = ({ data }) => {
+      if (data.type === 'live') {
+        Object.assign(engineSettings, data.settings)
+        renderer?.motion.restore(data.motion)
+        return
+      }
       if (data.type !== 'frame') return
       Object.assign(engineSettings, data.settings)
       remoteAudio = data.audio
       remoteSpectrum.set(data.spectrum)
       lastPacket = performance.now()
-      if (renderer && Math.abs(renderer.time - data.time) > 0.15) renderer.time = data.time
+      if (renderer) {
+        if (Math.abs(renderer.time - data.time) > 0.15) renderer.time = data.time
+        renderer.motion.restore(data.motion)
+      }
     }
   else refreshDevices()
   frame = requestAnimationFrame(tick)
@@ -489,6 +621,9 @@ onMounted(() => {
     if (document.hidden && !isOutput && outputOpen.value) processFrame(performance.now())
   }, 50)
   window.addEventListener('keydown', keydown)
+  window.addEventListener('keyup', liveKeyup)
+  window.addEventListener('blur', releaseLive)
+  document.addEventListener('visibilitychange', liveVisibility)
   navigator.mediaDevices?.addEventListener('devicechange', refreshDevices)
   // A read-only diagnostic surface for profiling. No audio data or controls are exposed.
   if (import.meta.env.DEV)
@@ -496,6 +631,20 @@ onMounted(() => {
       ...stats,
       time: renderer?.time,
       contextLost: renderer?.lost,
+      renderedScene: renderer?.scene,
+      readyScenes: renderer?.programs.size || 0,
+      failedScenes: [...(renderer?.failureMessages.entries() || [])],
+      loading: { ...graphicsLoading },
+      live: renderer
+        ? {
+            mode: renderer.motion.liveMode,
+            impact: renderer.motion.impact,
+            flash: renderer.motion.flash,
+            explosion: renderer.motion.explosion,
+            boost: renderer.motion.boost,
+            held: renderer.motion.boostHeld,
+          }
+        : null,
       source: source.value,
     })
 })
@@ -504,7 +653,11 @@ onBeforeUnmount(() => {
   clearInterval(backgroundTimer)
   clearTimeout(saveTimer)
   clearTimeout(toastTimer)
+  releaseLive()
   window.removeEventListener('keydown', keydown)
+  window.removeEventListener('keyup', liveKeyup)
+  window.removeEventListener('blur', releaseLive)
+  document.removeEventListener('visibilitychange', liveVisibility)
   navigator.mediaDevices?.removeEventListener('devicechange', refreshDevices)
   channel?.close()
   renderer?.destroy()
@@ -520,6 +673,30 @@ onBeforeUnmount(() => {
     </div>
     <div v-if="!outputConnected" class="projection-wait">
       En attente du poste de contrôle…<small>Garde la fenêtre Spectrum ouverte.</small>
+    </div>
+    <div
+      v-if="graphicsLoading.active"
+      class="graphics-loading"
+      :class="{ 'scene-waiting': graphicsLoading.waiting }"
+      role="status"
+    >
+      <div>
+        <strong>{{
+          graphicsLoading.waiting ? 'Préparation de la scène…' : 'Préchargement des scènes'
+        }}</strong
+        ><span>{{ graphicsLoading.completed }} / {{ graphicsLoading.total }}</span>
+      </div>
+      <progress
+        :value="graphicsLoading.completed"
+        :max="graphicsLoading.total"
+        aria-label="Préchargement des scènes"
+      ></progress>
+      <small
+        >{{ graphicsLoading.current
+        }}<template v-if="graphicsLoading.failed">
+          · {{ graphicsLoading.failed }} échec(s)</template
+        ></small
+      >
     </div>
     <div v-if="graphicsError" class="graphics-error">{{ graphicsError }}</div>
   </div>
@@ -646,24 +823,30 @@ onBeforeUnmount(() => {
               :style="{ height: `${Math.max(4, bar * 100)}%`, opacity: 0.2 + bar * 0.8 }"
             ></i>
           </div>
-          <div
-            class="band-meter"
-            v-for="band in [
-              { key: 'bass', label: 'Basses' },
-              { key: 'mid', label: 'Médiums' },
-              { key: 'high', label: 'Aigus' },
-            ]"
-            :key="band.key"
-          >
-            <span>{{ band.label }}</span>
-            <div><i :style="{ width: `${stats[band.key] * 100}%` }"></i></div>
-            <small>{{ Math.round(stats[band.key] * 100) }}</small>
-          </div>
-          <div class="bpm-row">
-            <span class="beat-dot" :style="{ opacity: 0.2 + stats.beat * 0.8 }"></span
-            ><strong>{{ source === 'demo' ? '124' : stats.bpm || '—' }}</strong
-            ><span>BPM {{ source === 'demo' ? 'DÉMO' : 'ESTIMÉS' }}</span>
-          </div>
+          <details class="audio-details">
+            <summary>Détails du signal audio</summary>
+            <div
+              class="band-meter"
+              v-for="band in [
+                { key: 'bass', label: 'Basses' },
+                { key: 'mid', label: 'Médiums' },
+                { key: 'high', label: 'Aigus' },
+              ]"
+              :key="band.key"
+            >
+              <span>{{ band.label }}</span>
+              <div><i :style="{ width: `${stats[band.key] * 100}%` }"></i></div>
+              <small>{{ Math.round(stats[band.key] * 100) }}</small>
+            </div>
+            <div class="bpm-row">
+              <span class="beat-dot" :style="{ opacity: 0.2 + stats.beat * 0.8 }"></span
+              ><strong>{{ source === 'demo' ? '124' : stats.bpm || '—' }}</strong
+              ><span>BPM {{ source === 'demo' ? 'DÉMO' : 'ESTIMÉS' }}</span>
+            </div>
+          </details>
+          <p class="motion-hint">
+            Branche ta musique : les frappes déclenchent les impacts et les flashs automatiquement.
+          </p>
         </div>
         <div class="local-note">
           <span>⌁</span>
@@ -704,6 +887,30 @@ onBeforeUnmount(() => {
             ><span>RÉACTIF AU SON <i :class="{ active: stats.level > 0.01 }"></i></span>
           </div>
           <button class="fullscreen-exit" @click="fullscreen">Quitter le plein écran ↙</button>
+          <div
+            v-if="graphicsLoading.active"
+            class="graphics-loading"
+            :class="{ 'scene-waiting': graphicsLoading.waiting }"
+            role="status"
+          >
+            <div>
+              <strong>{{
+                graphicsLoading.waiting ? 'Préparation de la scène…' : 'Préchargement des scènes'
+              }}</strong
+              ><span>{{ graphicsLoading.completed }} / {{ graphicsLoading.total }}</span>
+            </div>
+            <progress
+              :value="graphicsLoading.completed"
+              :max="graphicsLoading.total"
+              aria-label="Préchargement des scènes"
+            ></progress>
+            <small
+              >{{ graphicsLoading.current
+              }}<template v-if="graphicsLoading.failed">
+                · {{ graphicsLoading.failed }} échec(s)</template
+              ></small
+            >
+          </div>
           <div v-if="graphicsError" class="graphics-error" role="alert">{{ graphicsError }}</div>
         </div>
         <div class="transport">
@@ -765,7 +972,7 @@ onBeforeUnmount(() => {
           <div class="scenes-heading">
             <div>
               <span class="eyebrow">03 / SCÈNES</span
-              ><span class="scene-count">06 univers à explorer</span>
+              ><span class="scene-count">{{ scenes.length }} univers à explorer</span>
             </div>
             <label class="auto-control"
               ><span>Auto-pilote</span
@@ -776,20 +983,22 @@ onBeforeUnmount(() => {
           </div>
           <div class="scene-grid">
             <button
-              v-for="scene in scenes"
+              v-for="(scene, sceneIndex) in scenes"
               :key="scene.id"
               class="scene-card"
               :class="{ selected: settings.scene === scene.id }"
               :aria-pressed="settings.scene === scene.id"
+              :title="scene.tag"
               @click="selectScene(scene.id)"
             >
               <div class="scene-art" :class="scene.type">
-                <i></i><i></i><i></i><span class="scene-index">0{{ scene.id + 1 }}</span
+                <i></i><i></i><i></i
+                ><span class="scene-index">{{ String(sceneIndex + 1).padStart(2, '0') }}</span
                 ><span v-if="settings.scene === scene.id" class="scene-active">↗</span>
               </div>
               <div class="scene-caption">
                 <strong>{{ scene.name }}</strong
-                ><kbd>{{ scene.id + 1 }}</kbd>
+                ><kbd v-if="scene.id < 10">{{ (scene.id + 1) % 10 }}</kbd>
               </div>
             </button>
           </div>
@@ -805,7 +1014,7 @@ onBeforeUnmount(() => {
                 <option :value="24">24 s</option>
                 <option :value="48">48 s</option>
               </select></label
-            ><span v-else><kbd>1</kbd> – <kbd>6</kbd> pour changer de scène</span>
+            ><span v-else><kbd>→</kbd> pour parcourir les {{ scenes.length }} scènes</span>
           </div>
         </section>
       </section>
@@ -821,6 +1030,79 @@ onBeforeUnmount(() => {
             ↺ Réinitialiser
           </button>
         </div>
+        <section class="live-console control-group" :class="{ 'live-enabled': settings.liveMode }">
+          <label class="live-switch">
+            <span
+              >MODE LIVE
+              <small>{{
+                settings.liveMode ? 'Tu commandes les impacts' : 'Réactions automatiques'
+              }}</small></span
+            >
+            <input
+              v-model="settings.liveMode"
+              type="checkbox"
+              role="switch"
+              aria-label="Activer le pilotage live"
+            />
+          </label>
+          <template v-if="settings.liveMode">
+            <p class="motion-hint">
+              La scène continue de vivre. Déclenche les impacts toi-même, même sans musique.
+            </p>
+            <div class="live-pads">
+              <button
+                v-for="pad in livePads"
+                :key="pad.action"
+                type="button"
+                :class="{ 'pad-active': liveActive === pad.action }"
+                :disabled="settings.frozen || settings.blackout"
+                :aria-keyshortcuts="pad.key.toLowerCase()"
+                @pointerdown="
+                  (event) => {
+                    if (event.button === 0) {
+                      event.preventDefault()
+                      triggerLive(pad.action)
+                    }
+                  }
+                "
+                @click="
+                  (event) => {
+                    if (event.detail === 0) triggerLive(pad.action)
+                  }
+                "
+              >
+                <kbd>{{ pad.key }}</kbd
+                ><strong>{{ pad.name }}</strong
+                ><small>{{ pad.hint }}</small>
+              </button>
+              <button
+                type="button"
+                class="boost-pad"
+                :class="{ 'pad-active': boostHeld }"
+                :disabled="settings.frozen || settings.blackout"
+                aria-keyshortcuts="u"
+                @pointerdown="boostPointer"
+                @pointerup="releaseBoostPointer"
+                @pointercancel="releaseBoostPointer"
+                @lostpointercapture="releaseBoostPointer"
+                @keydown.space.prevent.stop="setBoostInput('button-space', true)"
+                @keyup.space.prevent.stop="setBoostInput('button-space', false)"
+                @keydown.enter.prevent.stop="setBoostInput('button-enter', true)"
+                @keyup.enter.prevent.stop="setBoostInput('button-enter', false)"
+                @blur="releaseBoostKeyboard"
+              >
+                <kbd>U</kbd><strong>Boost</strong><small>Maintenir pour accélérer</small>
+              </button>
+            </div>
+            <p class="motion-hint" v-if="settings.frozen || settings.blackout">
+              Réactive l’image pour utiliser les pads.
+            </p>
+            <p class="motion-hint" v-else>
+              J · frappe / K · flash / L · explosion / U maintenu · boost. Désactive le mode pour
+              retrouver l’automatique.
+            </p>
+          </template>
+        </section>
         <div class="control-group palette-group">
           <div class="section-label">
             PALETTE <span>{{ palettes[settings.palette].name }}</span>
@@ -840,42 +1122,122 @@ onBeforeUnmount(() => {
             </button>
           </div>
         </div>
-        <div class="control-group sliders">
-          <label
-            v-for="control in controls"
-            :key="control.key"
-            :class="{
-              dimmed: (control.key === 'detail' || control.orbital) && settings.scene !== 0,
-            }"
-            ><span
-              >{{ control.name
-              }}<output
-                >{{
-                  control.unit === '%'
-                    ? Math.round(settings[control.key] * 100)
-                    : settings[control.key].toFixed(2)
-                }}{{ control.unit }}</output
-              ></span
-            ><input
-              v-model.number="settings[control.key]"
-              type="range"
-              :min="control.min"
-              :max="control.max"
-              step=".01"
-              :disabled="(control.key === 'detail' || control.orbital) && settings.scene !== 0"
-          /></label>
-        </div>
-        <div class="control-group">
-          <div class="section-label">
-            COUCHES ORBITAL <span v-if="settings.scene !== 0">Scène 01</span>
+        <div class="render-controls">
+          <div class="control-group sliders">
+            <label
+              v-for="control in controls"
+              :key="control.key"
+              :class="{
+                dimmed: control.orbital && !isOrbital,
+              }"
+              ><span
+                >{{ control.name
+                }}<output
+                  >{{
+                    control.unit === '%'
+                      ? Math.round(settings[control.key] * 100)
+                      : settings[control.key].toFixed(2)
+                  }}{{ control.unit }}</output
+                ></span
+              ><input
+                v-model.number="settings[control.key]"
+                type="range"
+                :min="control.min"
+                :max="control.max"
+                step=".01"
+                :disabled="control.orbital && !isOrbital"
+            /></label>
           </div>
+        </div>
+        <div v-if="settings.scene !== 0" class="control-group motion-controls">
+          <div class="section-label">
+            MODE RAVE <span>{{ currentScene.name }}</span>
+          </div>
+          <p class="motion-hint">
+            La musique fait le travail. Dose simplement l’énergie, le relief et les effets.
+          </p>
+          <div class="sliders">
+            <label v-for="control in raveControls" :key="control.key">
+              <span
+                >{{ control.name
+                }}<output>{{ Math.round(settings[control.key] * 100) }}%</output></span
+              >
+              <input
+                v-model.number="settings[control.key]"
+                type="range"
+                min="0"
+                :max="control.max"
+                step=".01"
+              />
+            </label>
+          </div>
+          <label class="rave-toggle"
+            ><input
+              type="checkbox"
+              v-model="settings.bassRotation"
+              :disabled="settings.advancedMotion"
+            />
+            Tourner uniquement sur les basses</label
+          >
+          <details class="advanced-motion">
+            <summary>Réglages avancés des mouvements</summary>
+            <label class="rave-toggle"
+              ><input type="checkbox" v-model="settings.advancedMotion" /> Utiliser mes réglages
+              manuels</label
+            >
+            <p class="motion-hint">
+              Désactivé : les mouvements suivent automatiquement la musique. Activé : les réglages
+              ci-dessous prennent la main.
+            </p>
+            <fieldset :disabled="!settings.advancedMotion" class="motion-fieldset">
+              <div v-for="motion in motionChannels" :key="motion.key" class="motion-row">
+                <span>{{ motion.name }}</span>
+                <select
+                  v-model="settings[`${motion.key}Mode`]"
+                  :aria-label="`${motion.name} : mode`"
+                >
+                  <option value="continuous">Continu</option>
+                  <option value="audio">Audio uniquement</option>
+                  <option value="hybrid">Continu + audio</option>
+                </select>
+                <select
+                  v-model="settings[`${motion.key}Source`]"
+                  :disabled="settings[`${motion.key}Mode`] === 'continuous'"
+                  :aria-label="`${motion.name} : déclencheur`"
+                >
+                  <option value="bass">Basses</option>
+                  <option value="mid">Médiums</option>
+                  <option value="high">Aigus</option>
+                  <option value="beat">Frappes détectées</option>
+                </select>
+              </div>
+              <div class="sliders motion-sliders">
+                <label v-for="control in motionControls" :key="control.key">
+                  <span
+                    >{{ control.name
+                    }}<output>{{ Math.round(settings[control.key] * 100) }}%</output></span
+                  >
+                  <input
+                    v-model.number="settings[control.key]"
+                    type="range"
+                    :min="control.min"
+                    :max="control.max"
+                    step=".01"
+                  />
+                </label>
+              </div>
+            </fieldset>
+          </details>
+        </div>
+        <div v-if="isOrbital" class="control-group">
+          <div class="section-label">COUCHES ORBITAL</div>
           <div class="layer-buttons">
             <button
               v-for="layer in layers"
               :key="layer.key"
               :class="{ selected: settings[layer.key] }"
               :aria-pressed="settings[layer.key]"
-              :disabled="settings.scene !== 0"
+              :disabled="!isOrbital"
               @click="settings[layer.key] = !settings[layer.key]"
             >
               {{ layer.label }}
@@ -1009,9 +1371,11 @@ onBeforeUnmount(() => {
           virtuel.
         </p>
         <div class="shortcut-grid">
-          <span><kbd>1–6</kbd> Scène</span><span><kbd>F</kbd> Plein écran</span
+          <span><kbd>1–9 / 0</kbd> Scènes 1 à 10</span><span><kbd>F</kbd> Plein écran</span
           ><span><kbd>ESPACE</kbd> Figer les visuels</span><span><kbd>B</kbd> Écran noir</span
-          ><span><kbd>A</kbd> Auto-pilote</span><span><kbd>→</kbd> Scène suivante</span>
+          ><span><kbd>J / K / L</kbd> Frappe / Flash / Explosion en mode live</span
+          ><span><kbd>U</kbd> Boost maintenu en mode live</span><span><kbd>A</kbd> Auto-pilote</span
+          ><span><kbd>→</kbd> Scène suivante</span>
         </div>
         <p class="muted">
           Les BPM sont une estimation. Garde le poste de contrôle ouvert. Si ton navigateur suspend

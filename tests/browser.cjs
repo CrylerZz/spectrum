@@ -92,7 +92,15 @@ let debugEval
     if (await ev("!!document.querySelector('.demo-button')")) break
   }
   assert.ok(await ev("!!document.querySelector('.demo-button')"), 'App mounted')
-  await sleep(1800)
+  for (let i = 0; i < 900; i++) {
+    const state = await ev('window.__spectrumMetrics()')
+    assert.deepEqual(state.failedScenes, [], 'Every scene compiles')
+    if (!state.loading.active) break
+    await sleep(200)
+  }
+  const loaded = await ev('window.__spectrumMetrics()')
+  assert.equal(loaded.readyScenes, await ev("document.querySelectorAll('.scene-card').length"))
+  console.log(`PASS: ${loaded.readyScenes} scene programs preloaded`)
   assert.equal(
     await ev("document.querySelector('.graphics-error')?.textContent || ''"),
     '',
@@ -128,6 +136,37 @@ let debugEval
   await ev('document.exitFullscreen()')
   console.log('PASS: focused-button shortcuts, help focus and native fullscreen')
   if (process.argv.includes('--ui-only')) return
+  if (process.argv.includes('--live-only')) {
+    await checkLive()
+    assert.equal(errors.length, 0, JSON.stringify(errors))
+    return
+  }
+  async function checkLive() {
+    // Live pads must bypass audio onsets and release a held boost on focus loss.
+    await ev("document.querySelector('.live-switch input').click()")
+    await sleep(400)
+    assert.equal((await ev('window.__spectrumMetrics()')).live.impact, 0)
+    await call('Input.dispatchKeyEvent', { type: 'keyDown', key: 'j', code: 'KeyJ' }, s)
+    assert.ok((await ev('window.__spectrumMetrics()')).live.impact > 0)
+    assert.equal((await ev('window.__spectrumMetrics()')).live.flash, 0)
+    await call('Input.dispatchKeyEvent', { type: 'keyUp', key: 'j', code: 'KeyJ' }, s)
+    await call('Input.dispatchKeyEvent', { type: 'keyDown', key: 'k', code: 'KeyK' }, s)
+    assert.ok((await ev('window.__spectrumMetrics()')).live.flash > 0)
+    await call('Input.dispatchKeyEvent', { type: 'keyUp', key: 'k', code: 'KeyK' }, s)
+    await call('Input.dispatchKeyEvent', { type: 'keyDown', key: 'l', code: 'KeyL' }, s)
+    assert.ok((await ev('window.__spectrumMetrics()')).live.explosion > 0)
+    await call('Input.dispatchKeyEvent', { type: 'keyUp', key: 'l', code: 'KeyL' }, s)
+    await call('Input.dispatchKeyEvent', { type: 'keyDown', key: 'u', code: 'KeyU' }, s)
+    await sleep(250)
+    assert.ok((await ev('window.__spectrumMetrics()')).live.boost > 0.5)
+    await ev("window.dispatchEvent(new Event('blur'))")
+    assert.equal((await ev('window.__spectrumMetrics()')).live.held, false)
+    await call('Input.dispatchKeyEvent', { type: 'keyUp', key: 'u', code: 'KeyU' }, s)
+    await ev("document.querySelector('.live-switch input').click()")
+    await sleep(100)
+    assert.equal((await ev('window.__spectrumMetrics()')).live.mode, false)
+    console.log('PASS: live strike, flash, explosion, boost and focus-loss release')
+  }
   await ev("document.querySelector('.transport-play').click()")
   await sleep(700)
   assert.equal(
@@ -137,7 +176,8 @@ let debugEval
   assert.ok((await ev('window.__spectrumMetrics()')).level < 0.01)
   await ev("document.querySelector('.transport-play').click()")
   await sleep(300)
-  for (let scene = 0; scene < 6; scene++) {
+  const sceneCount = await ev("document.querySelectorAll('.scene-card').length")
+  for (let scene = 0; scene < sceneCount; scene++) {
     await ev(`document.querySelectorAll('.scene-card')[${scene}].click()`)
     await sleep(1800)
     assert.equal(
@@ -145,6 +185,12 @@ let debugEval
       0,
       `Scene ${scene}`,
     )
+    assert.equal(
+      await ev("document.querySelector('.graphics-error')?.textContent || ''"),
+      '',
+      `Scene ${scene} graphics`,
+    )
+    console.log(`PASS: scene ${scene + 1}/${sceneCount}`)
     results.push({ scene, metrics: await ev('window.__spectrumMetrics()') })
   }
   await ev("document.querySelectorAll('.scene-card')[0].click()")
@@ -165,6 +211,7 @@ let debugEval
     [0, 0, 0, 255],
   )
   await ev("document.querySelectorAll('.performance-buttons button')[1].click()")
+  await checkLive()
   // Preset round trip survives reload, transient blackout does not.
   await ev(
     "(()=>{const i=document.querySelector('.preset-row input');i.value='Browser test';i.dispatchEvent(new Event('input',{bubbles:true}));document.querySelector('form.preset-row').dispatchEvent(new Event('submit',{bubbles:true,cancelable:true}))})()",

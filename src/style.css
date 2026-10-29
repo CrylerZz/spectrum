@@ -1023,10 +1023,12 @@ kbd {
 }
 .palette-options {
   display: flex;
+  flex-wrap: wrap;
   gap: 10px;
   margin-top: 14px;
 }
 .palette-options button {
+  flex-shrink: 0;
   width: 30px;
   height: 30px;
   border-radius: 50%;
@@ -1041,6 +1043,12 @@ kbd {
 }
 .palette-options button.selected {
   box-shadow: 0 0 0 1px var(--accent);
+}
+.palette-options button.selected span {
+  color: #fff;
+  text-shadow:
+    0 1px 3px #000,
+    0 0 3px #000;
 }
 .sliders {
   display: flex;
@@ -1739,4 +1747,524 @@ kbd {
     scroll-behavior: auto !important;
     transition: none !important;
   }
+}
+
+/* Movement routing stays compact enough for the live control panel. */
+.motion-hint {
+  color: var(--muted, #9295a7);
+  font-size: 11px;
+  line-height: 1.6;
+  margin: 10px 0 16px;
+}
+.motion-row {
+  display: grid;
+  grid-template-columns: 1fr 1.3fr;
+  gap: 7px;
+  margin-bottom: 13px;
+  align-items: center;
+  font-size: 12px;
+}
+.motion-row > span {
+  grid-column: 1 / -1;
+}
+.motion-row select {
+  width: 100%;
+  min-width: 0;
+  font-size: 11px;
+}
+.motion-sliders {
+  margin-top: 20px;
+}
+.mandala {
+  background:
+    repeating-conic-gradient(from 15deg, #b66fee33 0deg 8deg, transparent 8deg 30deg), #080913;
+}
+.mandala i {
+  position: absolute;
+  width: 65px;
+  height: 65px;
+  left: calc(50% - 32px);
+  top: calc(50% - 32px);
+  border: 1px solid #d87aff;
+  border-radius: 28%;
+  box-shadow:
+    0 0 8px #b958ff66,
+    inset 0 0 8px #b958ff44;
+  transform: rotate(45deg);
+}
+.mandala i:nth-child(2) {
+  transform: rotate(75deg) scale(0.75);
+  border-color: #62eaff;
+}
+.mandala i:nth-child(3) {
+  transform: rotate(105deg) scale(0.5);
+  border-color: #f2c9ff;
+}
+
+.audio-details summary,
+.advanced-motion summary {
+  cursor: pointer;
+  color: var(--muted, #9295a7);
+  font-size: 12px;
+  padding: 14px 0;
+}
+.rave-toggle {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 12px;
+  line-height: 1.5;
+  margin: 18px 0;
+}
+.rave-toggle input {
+  accent-color: #c9ff58;
+}
+.motion-fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.motion-fieldset:disabled {
+  opacity: 0.45;
+}
+
+/* Distinct cover art for the extended scene library. */
+.reactor,
+.shock,
+.sonar,
+.gyro,
+.morph {
+  background: repeating-radial-gradient(
+    ellipse at center,
+    #080d14 0 8px,
+    #83ebf9aa 9px 10px,
+    #181126 11px 18px
+  );
+}
+.reactor {
+  background-color: #4e116a;
+  filter: hue-rotate(35deg);
+}
+.shock {
+  background-position: 20px 8px;
+  filter: hue-rotate(90deg);
+}
+.sonar {
+  background:
+    conic-gradient(from 40deg, #8aff8b99, transparent 75deg),
+    repeating-radial-gradient(circle, #081810 0 12px, #7bff9f88 13px 14px);
+}
+.gyro {
+  background-size: 100% 180%;
+  background-position: center;
+}
+.morph {
+  border-radius: 24%;
+  filter: hue-rotate(60deg);
+}
+.prism,
+.crystal,
+.matrix {
+  background: repeating-conic-gradient(
+    from 45deg,
+    #090a12 0deg 40deg,
+    #b987ffbb 42deg 45deg,
+    #142b35 46deg 90deg
+  );
+}
+.crystal {
+  background-size: 45px 45px;
+}
+.matrix {
+  background:
+    repeating-linear-gradient(45deg, transparent 0 16px, #66ddf988 17px 18px),
+    repeating-linear-gradient(-45deg, #090a12 0 16px, #b987ff99 17px 18px);
+}
+.laser {
+  background: repeating-conic-gradient(
+    from -65deg at 50% 110%,
+    #040a09 0deg 8deg,
+    #89ffb5cc 9deg 10deg,
+    #141323 11deg 18deg
+  );
+}
+.helix,
+.neural {
+  background: repeating-linear-gradient(
+    65deg,
+    #090b15 0 15px,
+    #ad69fbcc 16px 17px,
+    #132937 18px 30px
+  );
+}
+.neural {
+  background: repeating-conic-gradient(from 20deg, #09121d 0deg 57deg, #78ddfc88 58deg 60deg);
+  background-size: 40px 40px;
+}
+.singularity {
+  background: radial-gradient(
+    ellipse at center,
+    #020304 0 18%,
+    #f4aeffaa 19% 22%,
+    #7937ae66 25%,
+    #080c16 55%
+  );
+}
+.inferno {
+  background: repeating-conic-gradient(
+    from -15deg at 50% 120%,
+    #090916 0deg 8deg,
+    #ff724a99 9deg 11deg,
+    #b83b9899 12deg 14deg
+  );
+}
+
+.live-console {
+  border: 1px solid #394331;
+  border-radius: 8px;
+  padding: 14px;
+  margin: 15px 0;
+}
+.live-console.live-enabled {
+  border-color: var(--accent);
+  background: #baff4b08;
+}
+.live-switch {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  cursor: pointer;
+  font: 12px var(--mono);
+}
+.live-switch small {
+  display: block;
+  font: 11px var(--sans, sans-serif);
+  color: #9ca893;
+  margin-top: 6px;
+}
+.live-switch input {
+  accent-color: var(--accent);
+  width: 20px;
+  height: 20px;
+}
+.live-pads {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.live-pads button {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 14px 10px;
+  min-height: 100px;
+  text-align: left;
+  touch-action: none;
+  user-select: none;
+  border-radius: 6px;
+}
+.live-pads strong {
+  font-size: 13px;
+}
+.live-pads small {
+  color: #a3b198;
+  font-size: 10px;
+}
+.live-pads .pad-active {
+  background: #c8ff66;
+  color: #17200f;
+  border-color: #efffcf;
+  box-shadow: 0 0 22px #baff4b44;
+}
+.live-pads .pad-active small,
+.live-pads .pad-active kbd {
+  color: #293b1b;
+}
+
+/* Covers for the six spectacle scenes; live artwork is rendered by the shaders. */
+.rift {
+  background: linear-gradient(
+    100deg,
+    #050610 38%,
+    #7435a9 46%,
+    #d1f9ff 49%,
+    #1b1339 52%,
+    #c16bf9 55%,
+    #050610 64%
+  );
+}
+.metal {
+  background: radial-gradient(
+    ellipse at 55% 50%,
+    #070b11 0 15%,
+    #8a94aa 19%,
+    #edf6ff 22%,
+    #20232f 28%,
+    #aa2c69 33%,
+    #10141f 40%,
+    #040608 60%
+  );
+}
+.cathedral {
+  background: repeating-radial-gradient(
+    ellipse at 50% 95%,
+    #050917 0 9px,
+    #c5a5ff 10px 11px,
+    #142b46 13px 19px
+  );
+}
+.magnetic {
+  background: repeating-radial-gradient(
+    ellipse at center,
+    #050a15 0 5px,
+    #79e6ed99 6px 7px,
+    #12152b 9px 13px
+  );
+  background-size: 100% 150%;
+  background-position: center;
+}
+.fusion {
+  background:
+    radial-gradient(circle at 34% 50%, #fff4da, #ef459b 9%, transparent 30%),
+    radial-gradient(circle at 66% 50%, #e8ffff, #5484f5 9%, transparent 30%), #070815;
+}
+.living-prism {
+  background: conic-gradient(
+    from 45deg at 50% 50%,
+    #31204c,
+    #a08ec5,
+    #0b0c19,
+    #4ca1bb,
+    #192138,
+    #31204c
+  );
+}
+
+.graphics-loading {
+  position: absolute;
+  z-index: 4;
+  bottom: 48px;
+  left: 16px;
+  width: min(360px, calc(100% - 32px));
+  padding: 14px 16px;
+  background: #10140fed;
+  border: 1px solid #536143;
+  border-radius: 8px;
+  color: #dce8d0;
+  pointer-events: none;
+}
+.graphics-loading > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 12px;
+}
+.graphics-loading small {
+  display: block;
+  font-size: 11px;
+  color: #a8b89a;
+  margin-top: 7px;
+}
+.graphics-loading progress {
+  display: block;
+  width: 100%;
+  height: 6px;
+  margin-top: 12px;
+  accent-color: #d5ff62;
+}
+.graphics-loading.scene-waiting {
+  border-color: #d5ff62;
+}
+
+.code-rain {
+  background:
+    repeating-linear-gradient(
+      90deg,
+      transparent 0 12px,
+      #82ff9c88 13px 15px,
+      transparent 16px 23px
+    ),
+    linear-gradient(180deg, #112f1c, #07100c);
+}
+.code-rain:after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(0deg, #06110dcc 0 3px, transparent 4px 9px);
+}
+.data-tunnel {
+  background: repeating-conic-gradient(
+    from 20deg,
+    #0a111a 0deg 12deg,
+    #43dbb9aa 13deg 15deg,
+    #101729 16deg 30deg
+  );
+}
+.circuit {
+  background:
+    repeating-linear-gradient(90deg, transparent 0 17px, #8dedab88 18px 19px),
+    repeating-linear-gradient(0deg, #071710 0 17px, #8dedab88 18px 19px);
+}
+.portals {
+  background: repeating-radial-gradient(
+    ellipse,
+    #090917 0 9px,
+    #a091ff 10px 11px,
+    #19283d 12px 20px
+  );
+}
+.interference {
+  background: repeating-linear-gradient(8deg, #090c17 0 5px, #5bc2d299 6px 7px, #693c8588 8px 12px);
+}
+.cyber-city {
+  background:
+    linear-gradient(
+      90deg,
+      #192c43 0 17%,
+      #4481a9 18% 19%,
+      #060b15 20% 38%,
+      transparent 39% 61%,
+      #060b15 62% 80%,
+      #9649a4 81% 82%,
+      #261737 83%
+    ),
+    linear-gradient(0deg, #6c327f, #070912 65%);
+}
+
+/* Festival scene covers: lightweight, static previews. */
+.scene-art.supernova {
+  background:
+    radial-gradient(circle, #fff5ce, transparent 22%),
+    repeating-conic-gradient(#fe8d55 0deg 2deg, #140c2b 3deg 18deg);
+}
+.scene-art.thunderstorm {
+  background: repeating-linear-gradient(
+    115deg,
+    #11152b 0 26px,
+    #b3cfff 27px,
+    #4a5495 29px,
+    #11152b 31px 46px
+  );
+}
+.scene-art.electric-ocean {
+  background:
+    repeating-linear-gradient(174deg, transparent 0 8px, #4aceda88 9px 10px),
+    linear-gradient(#060d20 25%, #12486b);
+}
+.scene-art.neon-dunes {
+  background: repeating-radial-gradient(
+    ellipse at 20% 130%,
+    #1e1528 0 9px,
+    #f4b474 10px 11px,
+    #281a36 12px 18px
+  );
+}
+.scene-art.kinetic-ribbons {
+  background: repeating-linear-gradient(
+    35deg,
+    #0c1524 0 13px,
+    #8f67ca 14px 18px,
+    #56cbd2 19px 22px,
+    #0c1524 23px 34px
+  );
+}
+.scene-art.jellyfish {
+  background:
+    radial-gradient(ellipse at 50% 25%, #be92e7, #394668 25%, transparent 27%),
+    repeating-linear-gradient(90deg, #071c2b 0 12px, #567ca0 13px, #071c2b 15px 24px);
+}
+.scene-art.mechanical-swarm {
+  background: repeating-conic-gradient(from 25deg, #34475f 0% 25%, #101725 0% 50%) 0 0 / 24px 24px;
+}
+.scene-art.mobius {
+  background: repeating-radial-gradient(
+    ellipse at 35% 50%,
+    #111428 0 12px,
+    #9974c2 13px 15px,
+    #467f9c 16px 18px,
+    #111428 19px 25px
+  );
+}
+.scene-art.speaker-wall {
+  background: radial-gradient(
+      circle,
+      #18212a 0 15%,
+      #809aa7 17% 20%,
+      #24313d 22% 40%,
+      #9c627e 42% 45%,
+      #10171c 47%
+    )
+    0 0 / 40px 40px;
+}
+.scene-art.tectonic {
+  background: repeating-conic-gradient(
+    from 50deg at 35% 65%,
+    #1b1822 0deg 43deg,
+    #f08360 44deg 45deg,
+    #282031 46deg 90deg
+  );
+}
+.scene-art.borealis {
+  background:
+    repeating-linear-gradient(100deg, transparent 0 5px, #7de4be44 6px 9px),
+    linear-gradient(170deg, #081a25 15%, #469f99 45%, #393368 60%, #0c172b 85%);
+}
+.scene-art.spirograph {
+  background: repeating-conic-gradient(
+    from 25deg,
+    #111326 0deg 12deg,
+    #c28cda 13deg 14deg,
+    #122435 15deg 30deg
+  );
+}
+.scene-art.asteroids {
+  background:
+    radial-gradient(circle at 25% 60%, #7891ad, #1a2436 15%, transparent 16%),
+    radial-gradient(circle at 75% 25%, #bca198, #382c39 10%, transparent 11%), #080e1d;
+}
+.scene-art.fireworks {
+  background:
+    radial-gradient(circle, transparent 20%, #e9b27777 24%, transparent 50%),
+    repeating-conic-gradient(
+      from 10deg,
+      #141227 0deg 13deg,
+      #c97ea3 14deg 15deg,
+      #141227 16deg 30deg
+    );
+}
+.scene-art.lightfall {
+  background:
+    repeating-linear-gradient(
+      90deg,
+      transparent 0 11px,
+      #8fc6e466 12px 13px,
+      transparent 14px 21px
+    ),
+    linear-gradient(#19283a, #6689a0, #101928);
+}
+.scene-art.lava-lamp {
+  background:
+    radial-gradient(ellipse at 30% 65%, #ee955c 0 15%, transparent 30%),
+    radial-gradient(ellipse at 70% 35%, #cf6193 0 18%, transparent 35%), #211327;
+}
+.scene-art.op-art {
+  background: repeating-conic-gradient(#96b9d0 0deg 15deg, #152537 16deg 30deg);
+}
+.scene-art.luminous-weave {
+  background:
+    repeating-linear-gradient(0deg, transparent 0 11px, #77afb588 12px 17px, transparent 18px 25px),
+    repeating-linear-gradient(90deg, #17182a 0 11px, #bc83bb 12px 17px, #17182a 18px 25px);
+}
+.scene-art.compression {
+  background:
+    linear-gradient(90deg, #364963 0 20%, transparent 21% 79%, #6a4965 80%),
+    linear-gradient(#617a92 0 20%, #0e1725 21% 79%, #73526e 80%);
+}
+.scene-art.nebula {
+  background:
+    radial-gradient(ellipse at 25% 60%, #6c407a, transparent 65%),
+    radial-gradient(ellipse at 75% 30%, #397e98, transparent 65%), #0d1425;
 }

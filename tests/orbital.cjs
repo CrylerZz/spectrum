@@ -90,6 +90,16 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
     if (await ev('!!window.orbitalTest')) break
   }
   assert.ok(await ev('!!window.orbitalTest'), 'Renderer initializes')
+  const allScenes = await ev("import('/src/visuals/scenes.js').then(m => m.scenes)")
+  for (let i = 0; i < 900; i++) {
+    const state = await ev(
+      '({ready:orbitalTest.renderer.programs.size,failed:[...orbitalTest.renderer.failureMessages.entries()]})',
+    )
+    assert.deepEqual(state.failed, [])
+    if (state.ready === allScenes.length) break
+    await sleep(200)
+  }
+  assert.equal(await ev('orbitalTest.renderer.programs.size'), allScenes.length)
   await ev('for(let i=0;i<240;i++)orbitalTest.frame()')
   assert.equal(await ev('orbitalTest.renderer.gl.getError()'), 0)
   let shot = await call('Page.captureScreenshot', { format: 'png' }, s)
@@ -100,11 +110,24 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
   assert.ok(state.vertices > 10000)
   assert.ok(state.waves < 8)
   assert.ok(state.shocks < 5)
+  console.log('PASS: Orbital geometry and bounded waves')
   // Validate color output, source layer switches, and frozen-state stability.
   const pixels = () =>
     ev(
       `(()=>{orbitalTest.frame();const gl=orbitalTest.renderer.gl;const p=new Uint8Array(gl.drawingBufferWidth*gl.drawingBufferHeight*4);gl.readPixels(0,0,gl.drawingBufferWidth,gl.drawingBufferHeight,gl.RGBA,gl.UNSIGNED_BYTE,p);let sum=0;for(let i=0;i<p.length;i+=4)sum+=p[i]+p[i+1]+p[i+2];return sum})()`,
     )
+  for (const scene of allScenes) {
+    await ev(
+      `Object.assign(orbitalTest.settings,{scene:${scene.id},transition:0,frozen:false,raveFlash:0})`,
+    )
+    const light = await pixels()
+    assert.ok(light > 0, `${scene.name} produces visible pixels`)
+    assert.equal(await ev('orbitalTest.renderer.scene'), scene.id)
+    assert.equal(await ev('orbitalTest.renderer.gl.getError()'), 0, scene.name)
+    console.log(`PASS: rendered pixels for ${scene.name}`)
+  }
+  await ev('Object.assign(orbitalTest.settings,{scene:0,transition:0})')
+  await pixels()
   await ev('orbitalTest.settings.frozen=true')
   const frozen = await pixels()
   assert.equal(await pixels(), frozen)

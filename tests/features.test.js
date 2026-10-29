@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { Features } from '../src/audio/features.js'
-import { cleanSettings } from '../src/visuals/scenes.js'
+import { cleanSettings, scenes } from '../src/visuals/scenes.js'
 
 test('bass, voice and treble occupy independent bands at common sample rates', () => {
   for (const rate of [44100, 48000, 96000]) {
@@ -63,7 +63,7 @@ test('untrusted presets cannot inject invalid shader settings or transient perfo
     frozen: true,
     auto: true,
   })
-  assert.equal(s.scene, 5)
+  assert.equal(s.scene, Math.max(...scenes.map((scene) => scene.id)))
   assert.equal(s.palette, 0)
   assert.equal(s.intensity, 1)
   assert.equal(s.speed, 0.65)

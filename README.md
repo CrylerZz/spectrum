@@ -1,6 +1,6 @@
 # Spectrum — Live visual studio
 
-Studio local de visuels musicaux : interface Vue 3, analyse Web Audio et rendu WebGL indépendant. La scène **Orbital** reprend le cercle, les courbes ADN, la grille, les ondes et l’œil du visualiseur original. Cinq autres scènes sont disponibles : Hyperdrive, Aurora, Terrain, Liquid et Stardust.
+Studio local de visuels musicaux : interface Vue 3, analyse Web Audio et rendu WebGL indépendant. La scène **Orbital** reprend le cercle, les courbes ADN, la grille, les ondes et l’œil du visualiseur original. La bibliothèque comporte maintenant **53 scènes**, dont Orbital original conservé et une variante Orbital Overdrive.
 
 ## Démarrer
 
@@ -34,7 +34,7 @@ L’analyse audio et les réglages sont transmis entre les deux fenêtres avec `
 
 ## Contrôles
 
-- `1` à `6` : scènes ; `→` : scène suivante.
+- `1` à `9`, puis `0` : les dix premières scènes ; `→` : parcourir les trente-trois scènes. Toutes sont sélectionnables dans la galerie.
 - `F` : plein écran ; `Échap` : quitter le plein écran.
 - `Espace` : figer le mouvement et les données visuelles, sans arrêter la musique.
 - `B` : écran noir immédiat, sans arrêter le son.
@@ -44,6 +44,70 @@ L’analyse audio et les réglages sont transmis entre les deux fenêtres avec `
 Les palettes, sensibilité, intensité, vitesse, halo, transitions et couches Orbital sont réglables. Pour retrouver le rendu d’origine, choisir **Orbital**, la palette **Neon**, **Relief 3D à 100 %** et **Psychédélisme à 100 %**. Ces deux réglages peuvent monter à 150 %. Les anciens presets les reçoivent automatiquement à 100 %. Les BPM sont une estimation basée sur les impulsions de basses, pas une synchronisation DJ garantie. L’auto-pilote est temporisé, pas un détecteur de drops.
 
 Les réglages et jusqu’à 30 presets sont enregistrés dans le navigateur. Un preset peut être exporté/importé en JSON. Les états « figé » et « noir » ne sont pas restaurés au redémarrage.
+
+### Mix au démarrage
+
+À chaque lancement, le mix revient à une base modérée : sensibilité 1×, réponse des basses 0,80×, intensité 1×, mouvement 0,65×, détail 70 %, halo 50 %, énergie 100 %, profondeur 45 %, psychédélisme 20 %, flashs 0 %. La rotation sur les basses est activée, la chorégraphie manuelle désactivée. La scène, la palette et les autres réglages enregistrés restent restaurés. Les presets sont conservés et peuvent être chargés après le démarrage pour retrouver leurs valeurs exactes.
+
+## Scènes et commandes
+
+Vortex parcourt un cylindre courbe et tournant dont les cubes émergent des parois ; Mandala superpose des couronnes inclinées et décalées en profondeur ; Dust forme un essaim à trois bras ; Réacteur assemble une chambre de blocs qui s’étirent et se compriment avec les basses autour d’un noyau électrique ; Onde de choc déforme une membrane qui remplit le champ de vision, avec rotation en 3D ; Hélice transforme des rubans épais d’une double spirale en nœud ; Neurones projette un réseau spatial ; Matrice devient une sculpture de blocs mobiles. Plasma, Prisme, Orbital original et Gyroscope gardent leurs compositions de référence.
+
+Le **Mode Rave** pilote automatiquement les scènes autres qu’Orbital original. Quatre curseurs dosent **Énergie**, **Coup de sub · profondeur**, **Psychédélisme** et **Flashs sur les frappes**. Les frappes et attaques de basses déclenchent une impulsion de profondeur avec recul amorti, des fronts lumineux et des flashs brefs. La profondeur varie aussi entre les couches du mandala, les filaments et les plans de particules. Les flashs suivent le son, sans stroboscope périodique ; leur curseur à zéro les supprime. Les transformations de perspective sont procédurales dans le shader.
+
+**Tourner uniquement sur les basses** conserve la rotation par impulsions. Les curseurs Sensibilité audio, Réponse des basses, Intensité, Mouvement, Détail et Halo restent accessibles directement. Seuls les réglages détaillés de chorégraphie sont repliés ; **Utiliser mes réglages manuels** réactive les choix de rotation, déformation, déplacement, force, inertie et seuil. Les anciens réglages manuels restent enregistrés mais ne pilotent plus le mouvement tant que cette option n'est pas activée. Les niveaux basses/médiums/aigus et BPM sont des indicateurs de lecture, désormais regroupés sous **Détails du signal audio**.
+
+Ces réglages sont communs aux nouvelles scènes, enregistrés dans les presets et transmis à la projection avec les phases de mouvement. Orbital conserve son animation d'origine. Les anciens presets gardent leurs indices de scène : Hyperdrive devient Vortex, Aurora devient Filaments, Terrain devient Mandala, Liquid devient Plasma et Stardust devient Dust.
+
+### Bibliothèque de 53 scènes
+
+Orbital, Vortex, Filaments, Mandala, Plasma, Dust, Orbital Overdrive, Réacteur, Prisme, Onde de choc, Hélice, Laser Show, Singularité, Neurones, Inferno, Gyroscope, Matrice, Plasma Cyclone, Plasma Fission, Prisme Abyssal, Prisme Fracture, Faille dimensionnelle, Métal liquide, Cathédrale fractale, Champ magnétique, Réacteur à fusion, Prisme vivant, Matrix Rain, Data Tunnel, Circuit, Portails, Interférences et Cyber City.
+
+**Orbital Overdrive** projette l'image originale sur des plans inclinés, avec des poussées d'échelle et des contours épaissis sur les frappes ; la fleur ajoutée a été retirée. **Laser Show** garde une implantation symétrique : les basses ouvrent les éventails, les médiums dirigent les nappes parallèles, les aigus allument les faisceaux fins. Des balayages continus et symétriques maintiennent le mouvement même quand une bande reste à niveau élevé. Les basses modulent l’ouverture, les médiums le glissement des nappes, les aigus le déplacement des aiguilles. Pas de changements de séquence arbitraires ni de distorsion globale sur cette scène. En mode live, Frappe pilote les éventails, Explosion les nappes et Flash les aiguilles ; Boost augmente les trois groupes. **Singularité** sépare l'avant et l'arrière du disque d'accrétion et ajoute des jets polaires.
+
+Les variantes sont séparées : **Plasma Cyclone** enroule la matière, **Plasma Fission** ouvre des fractures ; **Prisme Abyssal** superpose des plans de kaléidoscope dans un domaine borné pour garder les formes visibles ; **Prisme Fracture** ouvre puis referme des failles dans un motif unique. Gyroscope Chaos est supprimé ; ses presets rejoignent Gyroscope original.
+
+Cristal, Sonar et Métamorphe sont supprimés. Leurs anciens identifiants ne sont pas réutilisés : les presets correspondants sont redirigés respectivement vers Prisme, Onde de choc et Plasma Cyclone, en gardant tous les autres réglages. Les presets des scènes conservées gardent leur destination. Les changements de scènes conservent Cut direct ou fondu.
+
+### Six scènes supplémentaires
+
+- **Faille dimensionnelle** : une déchirure s'ouvre sous la pression des basses et les coups de sub, révélant une matière turbulente ; des éclats quittent ses bords sur les frappes.
+- **Métal liquide** : une surface 3D comprimée par les basses, hérissée de pointes sur les impacts, avec des reflets procéduraux aux couleurs de la palette.
+- **Cathédrale fractale** : traversée d'arches pointues, colonnes et motifs imbriqués ; les basses resserrent l'architecture.
+- **Champ magnétique** : des filaments relient deux pôles mobiles ; les basses les écartent, les médiums animent les courbes et les aigus renforcent les étincelles. Le curseur Détail ajuste le nombre de filaments.
+- **Réacteur à fusion** : deux masses de plasma se rapprochent sur les impacts, fusionnent visuellement puis se séparent ; le bouton Frappe du mode live commande la collision, avec éjection de matière et onde de choc.
+- **Prisme vivant** : trois couches de plaques ouvrent une structure vers son cœur lumineux ; la musique ou les impulsions live commandent l'ouverture.
+
+Ces compositions réutilisent les palettes, les réglages de rendu, les transitions, les presets et le mode live. Les identifiants des scènes précédentes sont conservés. Les reflets du métal sont procéduraux, sans image d'environnement externe ; les filaments et l'architecture sont projetés depuis des coordonnées 3D. Leur performance et leur apparence n'ont pas été validées dans un navigateur pendant cette itération.
+
+### Univers numérique
+
+**Matrix Rain** fait tomber un alphabet procédural en quatre couches ; **Data Tunnel** transporte les symboles sur les parois d'un tunnel ; **Circuit** fait circuler des impulsions dans des pistes coudées ; **Portails** traverse des cadres hexagonaux ; **Interférences** déforme des ondes avec des décalages de lignes ; **Cyber City** avance entre des blocs 3D avec des fenêtres lumineuses. Pour une ambiance Matrix verte, choisir la palette **Laser vert** ; les autres palettes restent disponibles.
+
+Ces six scènes sont incluses dans le préchargement complet et le mode live. Elles n'utilisent aucune police ni texture distante. Cyber City bénéficie du budget de résolution réduit des scènes à géométrie plus coûteuse. Aucun test, build ni aperçu n'a été lancé pour cet ajout.
+
+### Niveaux et détection audio
+
+**Réponse des basses** ajuste le poids visuel des basses sans changer le volume d'écoute. Les niveaux utilisent une compression douce au lieu d'un écrêtage brutal, avec une retombée plus rapide. La détection des frappes travaille séparément, sur les variations du spectre flottant et l'enveloppe audio brute : les gains visuels ne peuvent plus supprimer les variations utilisées par le détecteur. Un compteur de frappes accompagne l'enveloppe pour transmettre les événements à la projection. Les BPM restent une estimation.
+
+## Pilotage live optionnel
+
+Le commutateur **MODE LIVE**, en haut du mix visuel, prend la main sur les déclenchements. Désactivé, les réactions automatiques et les réglages existants sont conservés. Activé, les scènes continuent d'évoluer et de réagir aux niveaux sonores, mais les frappes, flashs et explosions attendent les commandes du pupitre. Cela fonctionne sur les trente-trois scènes, y compris Orbital, même sans source audio.
+
+- **J / Frappe** : impulsion de profondeur et de mouvement, sans flash imposé.
+- **K / Flash** : éclair bref, dosé par le réglage Flashs du mode Rave.
+- **L / Explosion** : dispersion, déformation et poussée amplifiée.
+- **U maintenu / Boost** : accélération et énergie supplémentaires ; relâcher revient progressivement au niveau initial.
+
+Les pads fonctionnent à la souris et au toucher. Au clavier, les raccourcis n'interceptent pas la saisie dans les champs. Le bouton Boost accepte aussi Espace ou Entrée maintenus lorsqu'il a le focus. La perte de focus, un changement de scène, le gel ou l'écran noir libèrent le boost ; les pads sont désactivés pendant le gel et l'écran noir. La projection reçoit les commandes immédiatement et l'état du mouvement avec les images suivantes.
+
+Désactiver le mode live rend les déclenchements à l'audio sans changer les curseurs ni les réglages de chorégraphie. Le mode est propre à la session : le rechargement démarre en automatique ; charger un preset pendant une session conserve le choix live/auto en cours. Les actions et boosts ne sont pas enregistrés dans les presets.
+
+## Chargement graphique
+
+Les 53 scènes sont préparées dès le démarrage, une par une, avec une progression réelle dans l'aperçu et la projection. La scène sélectionnée passe en priorité ; son rendu démarre dès qu'elle est prête pendant que le reste se prépare. Tous les programmes préparés sont conservés pour les changements suivants. Si une scène demandée n'est pas encore prête, l'ancienne reste affichée pendant l'attente.
+
+Chaque programme ne contient que la scène concernée et ses fonctions nécessaires. `KHR_parallel_shader_compile`, lorsqu'il est disponible, permet de surveiller la compilation sans attendre de façon bloquante. Sans cette extension, le travail est fractionné mais un pilote peut encore bloquer brièvement sur une compilation individuelle. Les fondus composent deux programmes séparés ; ils ne recompilent pas toutes les scènes. Les scènes les plus lourdes ont un budget de pixels inférieur, y compris au premier rendu. La restauration du contexte relance le préchargement.
 
 ## Performance et architecture
 
@@ -87,6 +151,26 @@ Le script utilise Chrome headless via le protocole DevTools. Sur macOS, il cherc
 
 Le test ciblé `SPECTRUM_URL=http://127.0.0.1:5173 node tests/orbital.cjs` vérifie aussi la géométrie Orbital, les couches indépendantes, les palettes, le gel et les durées de vie bornées des vagues. Il produit des captures et une mesure à 1920 × 1080 dans `/tmp`.
 
-Les tests couvrent les six scènes, la démo, la lecture d’un vrai WAV local, pause/reprise, les presets, le cycle de vie d’une capture simulée, l’absence de son partagé, la projection et le format mobile. Les mesures headless sont un diagnostic reproductible, pas une garantie de FPS sur une autre machine ou de compatibilité avec une table physique.
+La suite existante a été écrite pour les six scènes initiales, la démo, la lecture d’un vrai WAV local, pause/reprise, les presets, le cycle de vie d’une capture simulée, l’absence de son partagé, la projection et le format mobile. Les mesures headless sont un diagnostic reproductible, pas une garantie de FPS sur une autre machine ou de compatibilité avec une table physique.
 
 L’interface ne contacte aucun serveur pour l’audio. Les polices Google Fonts peuvent être téléchargées par le navigateur ; les polices système prennent le relais hors ligne. Le build de production ne dépend pas d’un CDN JavaScript.
+
+Les derniers remaniements de scènes et variantes et la nouvelle détection audio n’ont pas été exécutés ni validés dans le navigateur : aucun test ni build lancé, conformément à la demande pour cette itération.
+
+### Validation du 29 octobre 2026
+
+La demande de ne pas lancer les tests a ensuite été levée. Les vérifications suivantes ont été exécutées avec succès sur la version à 33 scènes :
+
+- `npm test` : 9 tests, dont analyse audio, mode live, arrêt du boost et migration des presets.
+- `npm run build` : build de production Vite.
+- `npm run test:browser` : préchargement des 33 programmes, parcours des 33 scènes, audio démo/fichier, captures simulées, presets, projection, plein écran, gel, écran noir, restauration du contexte et mise en page mobile.
+- `npm run test:browser -- --live-only` : raccourcis frappe/flash/explosion, boost maintenu et relâchement sur perte de focus.
+- `SPECTRUM_URL=http://127.0.0.1:5173 node tests/orbital.cjs` : pixels non noirs pour les 33 scènes, aucune erreur WebGL, couches Orbital indépendantes, palettes, gel et durées de vie bornées des effets.
+
+Les mesures de parcours dans Chrome headless étaient généralement de 54 à 60 FPS ; Champ magnétique a atteint 44 FPS sur un échantillon. Orbital a tenu environ 60 FPS dans le contrôle ciblé à 1920 × 1080. Ces mesures ne garantissent pas les mêmes performances sur d'autres appareils, ni la qualité artistique de chaque scène. Les résultats détaillés et captures du passage sont dans `/tmp/spectrum-browser-results.json`, `/tmp/spectrum-desktop.png`, `/tmp/spectrum-mobile.png` et `/tmp/orbital-restored.png`.
+
+### Vingt scènes supplémentaires
+
+Supernova, Orage, Océan électrique, Dunes néon, Rubans cinétiques, Méduse, Essaim mécanique, Möbius, Mur de caissons, Tectonique, Aurore boréale, Spirographe, Astéroïdes, Feux d’artifice, Chute de lumière, Lampe à lave, Op Art, Tissage, Compression, Nébuleuse.
+
+Ces scènes utilisent les palettes, les réglages audio et le mode live existants. Elles sont incluses dans le préchargement progressif ; les compositions les plus coûteuses utilisent une résolution réduite. Les scènes précédentes et leurs identifiants sont conservés. Aucun test ni build lancé pour cet ajout, à la demande de l’utilisateur.

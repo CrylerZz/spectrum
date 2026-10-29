@@ -184,7 +184,8 @@ export class OrbitalScene {
       impact = audio[3],
       depth = settings.orbitalDepth ?? 1
     const psy = settings.orbitalPsy ?? 1,
-      hot = Math.min(1, Math.max(0, (e - 0.76) / 0.18) + impact * 0.35) * psy
+      hot =
+        Math.min(1, (settings.liveMode ? 0 : Math.max(0, (e - 0.76) / 0.18)) + impact * 0.35) * psy
     const circle =
       (this.sample(spectrum, 43) + this.sample(spectrum, 86) + this.sample(spectrum, 129)) / 3
     for (let i = 0; i < 5; i++) {
@@ -201,11 +202,11 @@ export class OrbitalScene {
     const count = Math.min(3, Math.floor(1 + e * 2)),
       frame = Math.floor(t * 18)
     const maxRadius = Math.hypot(this.logicalWidth / 2, this.logicalHeight / 2)
-    if ((e > 195 / 255 || impact > 0.85) && t - this.lastWave > 0.28) {
+    if (((!settings.liveMode && e > 195 / 255) || impact > 0.85) && t - this.lastWave > 0.28) {
       this.waves.push(t)
       this.lastWave = t
     }
-    if ((e > 195 / 255 || impact > 0.85) && t - this.lastShock > 0.6) {
+    if (((!settings.liveMode && e > 195 / 255) || impact > 0.85) && t - this.lastShock > 0.6) {
       this.shocks.push({
         time: t,
         radius: baseRadius,

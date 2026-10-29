@@ -17,10 +17,11 @@ export class AudioEngine {
       this.context = new AudioContext({ latencyHint: 'interactive' })
       this.analyser = this.context.createAnalyser()
       this.analyser.fftSize = 2048
-      this.analyser.smoothingTimeConstant = 0.55
+      this.analyser.smoothingTimeConstant = 0.25
       this.analyser.minDecibels = -85
       this.analyser.maxDecibels = -15
       this.frequency = new Uint8Array(this.analyser.frequencyBinCount)
+      this.decibels = new Float32Array(this.analyser.frequencyBinCount)
       this.waveform = new Uint8Array(this.analyser.fftSize)
       this.features = new Features(this.context.sampleRate, this.analyser.fftSize)
       this.output = this.context.createGain()
@@ -193,16 +194,26 @@ export class AudioEngine {
       await this.element.play()
     } else this.element.pause()
   }
-  update(dt, time, sensitivity) {
+  update(dt, time, sensitivity, bassGain = 1) {
     if (this.kind === 'idle' || !this.analyser) return this.features.values
     if (this.context.state === 'suspended') {
       this.frequency.fill(0)
+      this.decibels.fill(-Infinity)
       this.waveform.fill(128)
     } else {
       this.analyser.getByteFrequencyData(this.frequency)
+      this.analyser.getFloatFrequencyData(this.decibels)
       this.analyser.getByteTimeDomainData(this.waveform)
     }
-    return this.features.update(this.frequency, this.waveform, dt, time, sensitivity)
+    return this.features.update(
+      this.frequency,
+      this.waveform,
+      dt,
+      time,
+      sensitivity,
+      bassGain,
+      this.decibels,
+    )
   }
   async devices() {
     if (!navigator.mediaDevices?.enumerateDevices) return []
