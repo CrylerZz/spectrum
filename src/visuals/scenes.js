@@ -67,6 +67,48 @@ export const scenes = [
   { id: 54, name: 'Tissage', tag: 'Rubans · dessus dessous', type: 'luminous-weave' },
   { id: 55, name: 'Compression', tag: 'Chambre 3D · murs sous pression', type: 'compression' },
   { id: 56, name: 'Nébuleuse', tag: 'Nuages · couches cosmiques', type: 'nebula' },
+  {
+    id: 57,
+    name: 'Résonance rétro',
+    tag: 'Cœur plasma · couronnes électriques',
+    type: 'retro-resonance',
+  },
+  { id: 59, name: 'Soie moirée', tag: 'Voile · points et plis lumineux', type: 'moire-silk' },
+  { id: 60, name: 'Courants', tag: 'Lignes · tourbillons continus', type: 'contour-currents' },
+  { id: 61, name: 'Drapés acides', tag: 'Rubans · vagues psychédéliques', type: 'acid-drapes' },
+  {
+    id: 62,
+    name: 'Kaléidoscope mécanique',
+    tag: 'Métal · symétrie en profondeur',
+    type: 'kaleido-machine',
+  },
+  {
+    id: 63,
+    name: 'Citadelle cyan',
+    tag: 'Architecture · circuits et reflets',
+    type: 'cyan-citadel',
+  },
+  {
+    id: 64,
+    name: 'Turbine industrielle',
+    tag: 'Rotor · tuyaux et métal éclairé',
+    type: 'industrial-rotor',
+  },
+  { id: 65, name: 'Machines néon', tag: 'Réacteurs · chrome et bobines', type: 'neon-engines' },
+  { id: 66, name: 'Galaxies néon', tag: 'Spirales · plongée infinie', type: 'neon-galaxies' },
+  {
+    id: 67,
+    name: 'Rosace spectrale',
+    tag: 'Dentelle · cœur incandescent',
+    type: 'spectral-rosette',
+  },
+  {
+    id: 68,
+    name: 'Octogone mécanique',
+    tag: 'Couronnes · plaques et relief',
+    type: 'octagon-machine',
+  },
+  { id: 69, name: 'Abysse liquide', tag: 'Tunnel · chrome bleu et rose', type: 'liquid-abyss' },
 ]
 export const palettes = [
   { name: 'Neon', colors: ['#ea57ff', '#55e9ff', '#a193ff'] },
@@ -160,7 +202,7 @@ export function cleanSettings(input) {
   }
   out.scene = Math.round(out.scene)
   // Never reuse retired IDs: old presets keep their palettes and all other settings.
-  out.scene = { 13: 8, 14: 9, 19: 20, 24: 17 }[out.scene] ?? out.scene
+  out.scene = { 13: 8, 14: 9, 19: 20, 24: 17, 58: 11 }[out.scene] ?? out.scene
   if (!scenes.some((scene) => scene.id === out.scene)) out.scene = 0
   out.palette = Math.round(out.palette)
   for (const key of [

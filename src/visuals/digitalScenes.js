@@ -35,13 +35,17 @@ vec3 matrixRain(vec2 p) {
 vec3 dataTunnel(vec2 p) {
   float radius=max(.09,length(p)), angle=atan(p.y,p.x)+u_motion.x*.16;
   float depth=1.5/radius;
-  vec2 q=vec2(angle*8.0/PI,depth*2.0-u_motion.z*2.0);
+  vec2 q=vec2(angle*8.0/PI,depth*2.0-u_motion.z*2.8);
   vec2 cell=floor(q), uv=fract(q);
   float seed=hash(cell), glyph=codeGlyph(uv,seed*731.0);
   float packet=pow(max(0.0,sin(cell.y*.7+cell.x-u_motion.z*3.0)),8.0);
   vec3 col=tint(cell.x*.2)*glyph*(.25+packet)*( .5+radius*.3);
   float seams=min(min(uv.x,1.0-uv.x),min(uv.y,1.0-uv.y));
   col+=ink(seams,.008,u_c2)*(.08+u_impact*.1);
+  float rail=exp(-abs(uv.x-.08)*100.0)+exp(-abs(uv.x-.92)*100.0);
+  float stream=pow(.5+.5*sin(depth*12.0-u_motion.z*5.0+cell.x*.7),18.0);
+  col+=u_c2*rail*(.12+stream*.55)*( .5+radius*.25);
+  col+=u_c3*glyph*stream*min(u_impact,1.5)*.2;
   return col*smoothstep(.09,.25,radius);
 }
 vec3 circuitBoard(vec2 p) {
@@ -63,9 +67,9 @@ vec3 circuitBoard(vec2 p) {
 }
 vec3 cyberPortals(vec2 p) {
   vec3 col=vec3(0);
-  float t=u_motion.z*.4;
-  for(int i=0;i<7;i++) {
-    float f=float(i), z=fract(f/7.0-t*.09);
+  float t=u_motion.z*.65;
+  for(int i=0;i<11;i++) {
+    float f=float(i), z=fract(f/11.0-t*.09);
     float size=mix(.12,2.4,z*z);
     vec2 q=p*turn(u_motion.x*.16+f*.21+sin(u_motion.y*.2)*.2);
     float radius=length(q), angle=atan(q.y,q.x);
@@ -75,6 +79,9 @@ vec3 cyberPortals(vec2 p) {
     col+=ink(d,.004+.008*z,tint(f*.8))*gate;
     float packets=pow(max(0.0,sin(angle*18.0-u_motion.y*2.0+f)),12.0);
     col+=ink(d-.025,.003,u_c3)*gate*packets*(.3+u_audio.z);
+    col+=ink(d-.055,.006+.008*z,u_c1)*gate*.23;
+    float teeth=pow(.5+.5*cos(angle*48.0+f),18.0);
+    col+=u_c2*exp(-abs(d-.035)*80.0)*teeth*gate*(.2+min(u_impact,1.5)*.25);
   }
   return col;
 }

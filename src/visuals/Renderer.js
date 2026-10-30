@@ -225,9 +225,13 @@ export class Renderer {
           ? 520000
           : 1250000 * this.scale
     const expensive =
-      [1, 9, 26, 27, 28, 30, 36, 39, 41, 42, 43, 44, 48, 55, 56].includes(this.scene) ||
+      [
+        1, 9, 26, 27, 28, 30, 36, 39, 41, 42, 43, 44, 48, 55, 56, 59, 62, 63, 64, 65, 66, 67, 68,
+      ].includes(this.scene) ||
       (this.mix < 1 &&
-        [1, 9, 26, 27, 28, 30, 36, 39, 41, 42, 43, 44, 48, 55, 56].includes(this.previous))
+        [
+          1, 9, 26, 27, 28, 30, 36, 39, 41, 42, 43, 44, 48, 55, 56, 59, 62, 63, 64, 65, 66, 67, 68,
+        ].includes(this.previous))
     const budget = Math.min(
       baseBudget,
       expensive

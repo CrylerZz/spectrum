@@ -2268,3 +2268,138 @@ kbd {
     radial-gradient(ellipse at 25% 60%, #6c407a, transparent 65%),
     radial-gradient(ellipse at 75% 30%, #397e98, transparent 65%), #0d1425;
 }
+
+.scene-art.retro-resonance {
+  background:
+    radial-gradient(ellipse at center, #fffbd8 0 3%, #b5db68 7%, #54823855 22%, transparent 40%),
+    repeating-radial-gradient(
+      ellipse at center,
+      transparent 0 12px,
+      #8d8b4766 13px,
+      #62598677 14px,
+      transparent 15px 22px
+    ),
+    #080d08;
+}
+
+.scene-art.moire-silk {
+  background:
+    repeating-radial-gradient(
+      ellipse at 15% 50%,
+      transparent 0 3px,
+      #9ef5ff99 4px,
+      transparent 5px 7px
+    ),
+    linear-gradient(125deg, #126b94, #272463, #a72692);
+}
+.scene-art.contour-currents {
+  background: repeating-radial-gradient(
+    ellipse at 75% 130%,
+    #090c27 0 4px,
+    #666cbb 5px,
+    #902c93 6px,
+    #090c27 7px 10px
+  );
+}
+.scene-art.acid-drapes {
+  background: repeating-radial-gradient(
+    ellipse at 0% 110%,
+    #080717 0 8px,
+    #6934bd 9px 13px,
+    #ca497e 14px 18px,
+    #57c1d2 19px 21px,
+    #080717 22px 29px
+  );
+}
+.scene-art.kaleido-machine {
+  background: repeating-conic-gradient(
+    from 30deg,
+    #11204b 0deg 20deg,
+    #c74782 21deg 35deg,
+    #e7b949 36deg 38deg,
+    #120e24 39deg 60deg
+  );
+}
+.scene-art.cyan-citadel {
+  background:
+    repeating-conic-gradient(from 45deg, #122c49 0% 25%, #58cce2 0% 50%) center / 32px 32px,
+    #0b1728;
+}
+.scene-art.industrial-rotor {
+  background:
+    radial-gradient(circle at 40% 50%, #fff0aa 0 4%, #ef8c37 5% 9%, transparent 10%),
+    conic-gradient(
+      from 25deg at 40% 50%,
+      #407e9d,
+      #092335 9%,
+      #cd7b34 10% 13%,
+      #091322 14% 33%,
+      #5194ae 34% 42%,
+      #b76c28 43% 46%,
+      #091322 47% 66%,
+      #518eac 67% 75%,
+      #ba7430 76% 79%,
+      #081a2b 80%
+    );
+}
+.scene-art.neon-engines {
+  background:
+    radial-gradient(
+      ellipse at 25% 30%,
+      #b6ffff 0 4%,
+      #289ab9 5% 13%,
+      #c442ac 14% 17%,
+      transparent 18%
+    ),
+    radial-gradient(
+      ellipse at 75% 70%,
+      #b6ffff 0 4%,
+      #289ab9 5% 13%,
+      #c442ac 14% 17%,
+      transparent 18%
+    ),
+    repeating-conic-gradient(
+      from 45deg,
+      #131d46 0deg 40deg,
+      #d341a0 41deg 43deg,
+      #123955 44deg 90deg
+    );
+}
+.scene-art.neon-galaxies {
+  background: repeating-conic-gradient(
+    from 35deg,
+    #071127 0deg 20deg,
+    #1cb9e8 22deg 27deg,
+    #b5f7ff 28deg 30deg,
+    #d02ca1 31deg 37deg,
+    #070e25 40deg 60deg
+  );
+}
+.scene-art.spectral-rosette {
+  background:
+    radial-gradient(circle, #f63d17 0 8%, #f9bc36 10% 12%, transparent 14%),
+    repeating-conic-gradient(#193372 0deg 15deg, #b529a1 16deg 18deg, #0a1227 19deg 30deg);
+}
+.scene-art.octagon-machine {
+  background: repeating-radial-gradient(
+    ellipse,
+    #0c1027 0 9px,
+    #6581d6 10px 12px,
+    #863e5c 13px 18px,
+    #f49565 19px 20px,
+    #0c1027 21px 28px
+  );
+}
+.scene-art.liquid-abyss {
+  background:
+    radial-gradient(ellipse at 50% 60%, #070819 0 14%, transparent 16%),
+    repeating-radial-gradient(
+      ellipse at 50% 60%,
+      #060c20 0 9px,
+      #117cab 10px 13px,
+      #539ed7 14px,
+      #781b8e 15px 19px,
+      #c54fa7 20px,
+      #070b22 21px 30px
+    );
+}

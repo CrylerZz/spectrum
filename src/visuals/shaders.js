@@ -2,6 +2,10 @@ import { extraScenes } from './extraScenes'
 import { spectacleScenes } from './spectacleScenes'
 import { digitalScenes } from './digitalScenes'
 import { festivalScenes } from './festivalScenes'
+import { retroScene } from './retroScene'
+import { referenceFlowScenes } from './referenceFlowScenes'
+import { referenceMachineScenes, referenceModelForScene } from './referenceMachineScenes'
+import { sceneAtmospheres, atmosphereForScene } from './sceneAtmospheres'
 
 export const vertex = `
 attribute vec2 a_position;
@@ -144,6 +148,10 @@ ${extraScenes}
 ${spectacleScenes}
 ${digitalScenes}
 ${festivalScenes}
+${retroScene}
+${referenceFlowScenes}
+${referenceMachineScenes}
+${sceneAtmospheres}
 vec3 scene(int id, vec2 p) {
   if(id==0) return orbital(p);
   if(id==1) return vortexDepth(p);
@@ -198,6 +206,18 @@ vec3 scene(int id, vec2 p) {
   if(id==54) return luminousWeave(p);
   if(id==55) return compressionChamber(p);
   if(id==56) return cosmicNebula(p);
+  if(id==57) return retroResonance(p);
+  if(id==59) return moireSilk(p);
+  if(id==60) return contourCurrents(p);
+  if(id==61) return acidDrapes(p);
+  if(id==62) return kaleidoMachinery(p);
+  if(id==63) return cyanCitadel(p);
+  if(id==64) return industrialRotor(p);
+  if(id==65) return neonEngines(p);
+  if(id==66) return neonGalaxies(p);
+  if(id==67) return spectralRosette(p);
+  if(id==68) return octagonMachinery(p);
+  if(id==69) return liquidAbyss(p);
   return gyro(p);
 }
 vec3 finishedScene(int id, vec2 p) {
@@ -212,9 +232,20 @@ vec3 finishedScene(int id, vec2 p) {
   }
   if(id==11) {
     // Preserve a readable stage rig: no kaleidoscope, twist or random colour remap.
-    vec3 beams=laserShow(p)*u_settings.x*(1.0+u_live.z);
+    vec3 rig=laserShow(p);
+    vec3 venue=sceneAtmosphere(p)/(1.0+max(rig.r,max(rig.g,rig.b))*4.0);
+    vec3 beams=(rig+venue)*u_settings.x*(1.0+u_live.z);
     beams=1.0-exp(-beams*1.65);
     return mix(beams,vec3(1.0),u_live.x*u_kick.y*u_rave.w*.65);
+  }
+  if(id>=59) {
+    // Reference compositions own their depth, deformation and full-frame material.
+    vec2 framed=p/max(.8,1.0+u_kick.x*u_rave.y*.06);
+    vec3 composed=scene(id,framed)*u_settings.x*(.85+u_rave.x*.25+u_live.z*.5);
+    composed=mix(composed,composed.gbr,clamp(u_rave.z*.12,0.0,.3));
+    composed=1.0-exp(-max(composed,vec3(0))*1.5);
+    float flash=min(.8,u_kick.y*u_rave.w*.7);
+    return mix(composed,vec3(1.0,.97,1.0),flash);
   }
   float energy=u_rave.x+u_live.z, psy=u_rave.z+u_live.y*.8;
   float r=length(p), a=atan(p.y,p.x);
@@ -229,13 +260,18 @@ vec3 finishedScene(int id, vec2 p) {
   // A separate live burst scatters the geometry and opens radial tears.
   q/=1.0+u_live.y*.7;
   q+=u_live.y*.12*vec2(sin(a*13.0+r*8.0),cos(a*11.0-r*9.0));
-  vec3 color=scene(id,q)*u_settings.x*(1.1+energy*.45+u_impact*.35);
+  vec3 subject=scene(id,q);
+  // Scene-specific depth layers remain visible in the gaps and at wide-screen edges.
+  // Bright foreground details occlude them, retaining their silhouette and contrast.
+  float coverage=max(subject.r,max(subject.g,subject.b));
+  vec3 depthLayer=sceneAtmosphere(q)/(1.0+coverage*4.0);
+  vec3 color=(subject+depthLayer)*u_settings.x*(1.1+energy*.45+u_impact*.35);
   // Saturated colour separation without rendering the entire scene multiple times.
   vec3 spectral=.55+.45*cos(vec3(0.0,2.1,4.2)+r*5.0+u_motion.y*.7);
   color=mix(color,color* spectral*2.0,clamp(psy*.3,0.0,.7));
   color += color.gbr*psy*u_kick.y*.38;
   color+=tint(a*4.0)*pow(max(0.0,cos(a*32.0+r*9.0)),24.0)*u_live.y*.9;
-  color *= 1.0-smoothstep(.6,2.4,r)*.25;
+  color *= 1.0-smoothstep(.9,3.0,r)*.08;
   color=1.0-exp(-max(color,vec3(0.0))*1.65);
   float flash=u_kick.y*u_rave.w;
   // Brief full-frame flash and a colour-negative edge on the attack.
@@ -293,13 +329,17 @@ export function fragmentForScene(id) {
   if (!selected) throw new Error(`Scène inconnue : ${id}`)
   const functions = new Map(shaderFunctions)
   functions.set('scene', `vec3 scene(int id, vec2 p) { return ${selected}(p); }`)
+  functions.set('sceneAtmosphere', atmosphereForScene(id))
+  const model = referenceModelForScene(id)
+  if (model) functions.set('referenceMachineDistance', model)
   let finish = functions.get('finishedScene')
   for (const [sceneId, condition] of [
     [0, 'if (id == 0)'],
     [11, 'if(id==11)'],
+    [59, 'if(id>=59)'],
   ]) {
     const branch = takeBranch(finish, condition)
-    if (id === sceneId) {
+    if (id === sceneId || (sceneId === 59 && id >= 59)) {
       finish = `vec3 finishedScene(int id, vec2 p) { ${branch.body} }`
       break
     }

@@ -33,7 +33,7 @@ vec2 tunnelBend(float z) {
               cos(z*.263)*.9+sin(z*.173)*.7);
 }
 vec2 tunnelSurface(vec3 point) {
-  float travel=u_motion.z*1.3, z=point.z+travel;
+  float travel=u_motion.z*1.9, z=point.z+travel;
   vec2 center=tunnelBend(z)-tunnelBend(travel);
   vec2 q=point.xy-center;
   float radius=length(q), angle=atan(q.y,q.x)-u_motion.x*.38-z*.16;
@@ -41,7 +41,7 @@ vec2 tunnelSurface(vec3 point) {
   float tangential=(mod(angle+sector*.5,sector)-sector*.5)*1.7;
   float along=mod(z+.65,1.3)-.65;
   float bass=u_live.x>.5 ? min(1.0,u_impact*.6) : u_audio.x;
-  float protrusion=.28+bass*.28;
+  float protrusion=.32+bass*.42+min(1.5,u_impact)*.14;
   // Every block overlaps the cylinder: its root stays embedded in the same wall.
   vec3 box=abs(vec3(tangential,along,radius-(1.7+.35-protrusion)))-vec3(.25,.3,.35);
   float block=length(max(box,0.0))+min(max(box.x,max(box.y,box.z)),0.0);
@@ -63,14 +63,22 @@ vec3 vortexDepth(vec2 p) {
     tunnelSurface(point+vec3(.012,0,0)).x-tunnelSurface(point-vec3(.012,0,0)).x,
     tunnelSurface(point+vec3(0,.012,0)).x-tunnelSurface(point-vec3(0,.012,0)).x,
     tunnelSurface(point+vec3(0,0,.012)).x-tunnelSurface(point-vec3(0,0,.012)).x)+vec3(.00001));
-  float worldZ=point.z+u_motion.z*1.3;
-  vec2 wallPoint=point.xy-tunnelBend(worldZ)+tunnelBend(u_motion.z*1.3);
+  float worldZ=point.z+u_motion.z*1.9;
+  vec2 wallPoint=point.xy-tunnelBend(worldZ)+tunnelBend(u_motion.z*1.9);
   float angle=atan(wallPoint.y,wallPoint.x)-u_motion.x*.38-worldZ*.16;
   float cross=abs(sin(angle*5.0));
   float rings=abs(sin(worldZ*PI/1.3));
   vec3 color=tint(worldZ*.25)*(.09+.45*max(0.0,dot(normal,-ray)));
   color+=ink(min(cross,rings),.025,u_c2)*(.35+.35*surface.y);
   color+=tint(angle)*surface.y*(.3+.5*pow(max(0.0,dot(normal,normalize(vec3(-.3,.6,-1.0)))),5.0));
+  // Detail stays on the bent cylinder and its blocks, with motion along the walls.
+  float ribs=abs(sin(worldZ*PI*7.0/1.3));
+  float lanes=pow(max(0.0,cos(angle*20.0)),26.0);
+  float chase=pow(.5+.5*sin(worldZ*5.0-u_motion.z*4.0+angle*3.0),14.0);
+  color+=u_c1*exp(-ribs*38.0)*(.09+.13*surface.y)*u_settings.y;
+  color+=u_c2*lanes*(.15+chase*(.5+min(u_impact,1.5)*.4));
+  float specular=pow(max(0.0,dot(reflect(normalize(vec3(.4,-.6,1.0)),normal),-ray)),24.0);
+  color+=u_c3*specular*(.18+surface.y*.3);
   return color*exp(-distance*.055);
 }
 vec3 mandalaDepth(vec2 p) {

@@ -26,10 +26,6 @@ export class Features {
     ])
     this.previousMagnitudes = new Float32Array(fftSize / 2)
     this.fluxFloor = 0
-    this.floor = 0
-    this.levelFloor = 0.1
-    this.previousLevel = 0
-    this.previousBass = 0
     this.lastBeat = -10
     this.intervals = []
   }
@@ -68,16 +64,11 @@ export class Features {
     }
     const bass = Math.sqrt(bassEnergy / Math.max(1, hi - lo))
     const flux = magnitudeSum > 0.0001 ? positiveFlux / magnitudeSum / Math.max(dt, 0.004) : 0
-    const onset =
-      (bass > 0.0005 && flux > Math.max(2.1, this.fluxFloor * 1.65)) ||
-      (rawLevel > Math.max(0.008, this.levelFloor * 1.12) &&
-        rawLevel - this.previousLevel > Math.max(0.001, dt * 0.065))
-    this.floor += (bass - this.floor) * (1 - Math.exp(-dt * 1.5))
+    // Only low-frequency attacks drive beats. A broadband volume rise can come
+    // from vocals, snares or cymbals and must not masquerade as a bass hit.
+    const onset = bass > 0.0005 && flux > Math.max(2.1, this.fluxFloor * 1.65)
     this.fluxFloor += (flux - this.fluxFloor) * (1 - Math.exp(-dt * 2))
-    this.levelFloor += (rawLevel - this.levelFloor) * (1 - Math.exp(-dt * 2))
     this.values.beat *= Math.exp(-dt * 9)
-    this.previousBass = bass
-    this.previousLevel = rawLevel
     if (onset && time - this.lastBeat > 0.22) {
       const interval = time - this.lastBeat
       if (interval > 0.25 && interval < 1) {

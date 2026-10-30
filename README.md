@@ -1,6 +1,6 @@
 # Spectrum — Live visual studio
 
-Studio local de visuels musicaux : interface Vue 3, analyse Web Audio et rendu WebGL indépendant. La scène **Orbital** reprend le cercle, les courbes ADN, la grille, les ondes et l’œil du visualiseur original. La bibliothèque comporte maintenant **53 scènes**, dont Orbital original conservé et une variante Orbital Overdrive.
+Studio local de visuels musicaux : interface Vue 3, analyse Web Audio et rendu WebGL indépendant. La scène **Orbital** reprend le cercle, les courbes ADN, la grille, les ondes et l’œil du visualiseur original. La bibliothèque comporte maintenant **65 scènes**, dont Orbital original conservé et une variante Orbital Overdrive.
 
 ## Démarrer
 
@@ -59,7 +59,7 @@ Le **Mode Rave** pilote automatiquement les scènes autres qu’Orbital original
 
 Ces réglages sont communs aux nouvelles scènes, enregistrés dans les presets et transmis à la projection avec les phases de mouvement. Orbital conserve son animation d'origine. Les anciens presets gardent leurs indices de scène : Hyperdrive devient Vortex, Aurora devient Filaments, Terrain devient Mandala, Liquid devient Plasma et Stardust devient Dust.
 
-### Bibliothèque de 53 scènes
+### Bibliothèque de 65 scènes
 
 Orbital, Vortex, Filaments, Mandala, Plasma, Dust, Orbital Overdrive, Réacteur, Prisme, Onde de choc, Hélice, Laser Show, Singularité, Neurones, Inferno, Gyroscope, Matrice, Plasma Cyclone, Plasma Fission, Prisme Abyssal, Prisme Fracture, Faille dimensionnelle, Métal liquide, Cathédrale fractale, Champ magnétique, Réacteur à fusion, Prisme vivant, Matrix Rain, Data Tunnel, Circuit, Portails, Interférences et Cyber City.
 
@@ -105,7 +105,7 @@ Désactiver le mode live rend les déclenchements à l'audio sans changer les cu
 
 ## Chargement graphique
 
-Les 53 scènes sont préparées dès le démarrage, une par une, avec une progression réelle dans l'aperçu et la projection. La scène sélectionnée passe en priorité ; son rendu démarre dès qu'elle est prête pendant que le reste se prépare. Tous les programmes préparés sont conservés pour les changements suivants. Si une scène demandée n'est pas encore prête, l'ancienne reste affichée pendant l'attente.
+Les 65 scènes sont préparées dès le démarrage, une par une, avec une progression réelle dans l'aperçu et la projection. La scène sélectionnée passe en priorité ; son rendu démarre dès qu'elle est prête pendant que le reste se prépare. Tous les programmes préparés sont conservés pour les changements suivants. Si une scène demandée n'est pas encore prête, l'ancienne reste affichée pendant l'attente.
 
 Chaque programme ne contient que la scène concernée et ses fonctions nécessaires. `KHR_parallel_shader_compile`, lorsqu'il est disponible, permet de surveiller la compilation sans attendre de façon bloquante. Sans cette extension, le travail est fractionné mais un pilote peut encore bloquer brièvement sur une compilation individuelle. Les fondus composent deux programmes séparés ; ils ne recompilent pas toutes les scènes. Les scènes les plus lourdes ont un budget de pixels inférieur, y compris au premier rendu. La restauration du contexte relance le préchargement.
 
@@ -174,3 +174,31 @@ Les mesures de parcours dans Chrome headless étaient généralement de 54 à 60
 Supernova, Orage, Océan électrique, Dunes néon, Rubans cinétiques, Méduse, Essaim mécanique, Möbius, Mur de caissons, Tectonique, Aurore boréale, Spirographe, Astéroïdes, Feux d’artifice, Chute de lumière, Lampe à lave, Op Art, Tissage, Compression, Nébuleuse.
 
 Ces scènes utilisent les palettes, les réglages audio et le mode live existants. Elles sont incluses dans le préchargement progressif ; les compositions les plus coûteuses utilisent une résolution réduite. Les scènes précédentes et leurs identifiants sont conservés. Aucun test ni build lancé pour cet ajout, à la demande de l’utilisateur.
+
+### Résonance rétro
+
+Scène inspirée de la référence Windows Media Player : noyau blanc et vert doré, rayons fins et couronnes électriques inclinées. Les basses pilotent la pulsation et les mouvements ; les aigus ajoutent un frémissement aux filaments. La couleur conserve une base rétro modulée par la palette choisie. Incluse dans le préchargement et le mode live. Aucun test ni build lancé pour cet ajout.
+
+### Remplissage du cadre
+
+Les scènes disposent de couches de fond adaptées à leur famille : filaments en plusieurs plans, particules, facettes, structures, matière fluide, lignes ondulées, brume ou fumée de scène. Elles occupent aussi les côtés des formats larges. Les visuels déjà denses reçoivent un apport plus discret ; les détails lumineux au premier plan masquent le fond pour garder du contraste. Le réglage Détail / densité dose ces couches. Orbital original reste intact. Aucun anneau de choc commun n’est ajouté.
+
+Chaque programme ne compile que sa famille de fond, sans rendre une deuxième fois la scène complète. Aucun test ni build lancé pour cette modification.
+
+### Onze références visuelles
+
+Soie moirée, Courants, Drapés acides, Kaléidoscope mécanique, Citadelle cyan, Turbine industrielle, Machines néon, Galaxies néon, Rosace spectrale, Octogone mécanique, Abysse liquide.
+
+Onze compositions procédurales inspirées des images fournies. Les nappes fluides remplissent le cadre. Les cinq scènes mécaniques utilisent des surfaces 3D, normales, reflets et éléments émissifs ; chaque programme ne conserve que son propre modèle de géométrie. Les nouvelles scènes gèrent leurs déformations directement, sans superposition du fond commun ni distorsion globale de la structure. Elles utilisent les contrôles audio, le mode live, les palettes et le préchargement existants. Les couleurs de référence sont dominantes, avec une contribution de la palette choisie.
+
+Aucun test, build ou aperçu lancé : la fidélité visuelle et les performances de ces nouvelles compositions restent à évaluer dans le navigateur.
+
+Les anciens tunnels Vortex, Data Tunnel et Portails ont également été renforcés : progression plus rapide, détails et passages lumineux sur les parois, blocs plus saillants sur les basses dans Vortex, et davantage de cadres épais dans Portails. Les blocs restent ancrés dans le cylindre courbe de Vortex.
+
+### Densification des références
+
+Kaléidoscope mécanique, Citadelle cyan, Turbine industrielle, Machines néon et Octogone mécanique possèdent désormais des assemblages à bords arrondis avec logements évidés, grilles, fixations et liserés, ainsi que des détails spécifiques (denture, conduites, cages et plaques). Le réglage de détail dose les finitions et certaines couronnes supplémentaires. Rosace spectrale superpose trois plans de dentelle polygonale, avec croisillons et points lumineux.
+
+Les galaxies ont chacune une dérive orbitale, une rotation, un changement d’aplatissement et des bras qui se déforment ; les basses accentuent leur dilatation. Le rendu inclut les cellules voisines pour éviter de couper les galaxies à leurs frontières. Le budget de résolution des scènes coûteuses s’applique aussi à Galaxies néon et Rosace spectrale. Aucun test, build ou aperçu lancé pour cette révision.
+
+Mainstage a été retirée du catalogue et du préchargement. Ses anciens presets redirigent vers Laser Show, en conservant les autres réglages. Pour Citadelle cyan et Kaléidoscope mécanique, les grilles et fixations fines sont désormais calculées dans le matériau visible plutôt que dans la géométrie à chaque pas du rayon ; les volumes principaux et les liserés restent en 3D. Aucun test ni build lancé ; le gain de fluidité reste à mesurer.

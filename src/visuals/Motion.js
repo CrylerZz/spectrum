@@ -97,7 +97,7 @@ export class Motion {
           ? 'audio'
           : 'hybrid'
         : (settings[`${key}Mode`] ?? 'hybrid')
-      const source = automatic ? (i === 1 ? 'mid' : 'bass') : (settings[`${key}Source`] ?? 'bass')
+      const source = automatic ? 'bass' : (settings[`${key}Source`] ?? 'bass')
       const value = audio[source] || 0
       this.cooldowns[i] = Math.max(0, this.cooldowns[i] - dt)
       const onset =
