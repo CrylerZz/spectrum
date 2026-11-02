@@ -65,26 +65,7 @@ vec3 circuitBoard(vec2 p) {
   } else col+=ink(length(uv),.025,u_c2)*(.1+pulse*.5);
   return col;
 }
-vec3 cyberPortals(vec2 p) {
-  vec3 col=vec3(0);
-  float t=u_motion.z*.65;
-  for(int i=0;i<11;i++) {
-    float f=float(i), z=fract(f/11.0-t*.09);
-    float size=mix(.12,2.4,z*z);
-    vec2 q=p*turn(u_motion.x*.16+f*.21+sin(u_motion.y*.2)*.2);
-    float radius=length(q), angle=atan(q.y,q.x);
-    float polygon=cos(mod(angle+PI/6.0,PI/3.0)-PI/6.0)*radius;
-    float d=polygon-size;
-    float gate=sin(z*PI);
-    col+=ink(d,.004+.008*z,tint(f*.8))*gate;
-    float packets=pow(max(0.0,sin(angle*18.0-u_motion.y*2.0+f)),12.0);
-    col+=ink(d-.025,.003,u_c3)*gate*packets*(.3+u_audio.z);
-    col+=ink(d-.055,.006+.008*z,u_c1)*gate*.23;
-    float teeth=pow(.5+.5*cos(angle*48.0+f),18.0);
-    col+=u_c2*exp(-abs(d-.035)*80.0)*teeth*gate*(.2+min(u_impact,1.5)*.25);
-  }
-  return col;
-}
+
 vec3 digitalInterference(vec2 p) {
   float row=floor(p.y*24.0), seed=hash(vec2(row,floor(u_motion.z*2.0)));
   float glitch=u_live.x>.5 ? min(1.0,u_live.y+u_impact*.3) : min(1.0,u_impact*.35+u_audio.z*.25);
@@ -101,31 +82,5 @@ vec3 digitalInterference(vec2 p) {
   col+=u_c3*step(.96,seed)*glitch*.25;
   return col;
 }
-vec3 cyberCity(vec2 p) {
-  vec3 col=vec3(0); float nearest=10000.0;
-  float travel=u_motion.z*.65;
-  for(int i=0;i<20;i++) {
-    float f=float(i), side=mod(f,2.0)*2.0-1.0;
-    float block=floor(f/2.0);
-    float z=mod(block*1.5-travel,15.0)-2.2;
-    float height=.5+hash(vec2(block,side))*1.5;
-    height*=1.0+(u_live.x>.5 ? u_impact*.12 : u_audio.x*.2);
-    vec3 center=vec3(side*1.6,-.9+height*.5,z);
-    vec4 hit=cubeHit(p,center,vec3(.4,height*.5,.48),vec2(0),tint(block*.6+side));
-    if(hit.w<nearest) {
-      nearest=hit.w;
-      col=hit.rgb*exp(-hit.w*.06);
-      vec3 rayPoint=vec3(0,0,-4)+normalize(vec3(p,2.0))*hit.w;
-      vec2 window=fract(vec2((rayPoint.x+rayPoint.z)*5.0,rayPoint.y*7.0));
-      col+=u_c2*step(.22,window.x)*step(window.x,.65)*step(.2,window.y)*step(window.y,.55)*.4;
-    }
-  }
-  if(nearest<9999.0) return col;
-  float horizon=max(.03,-p.y);
-  vec2 road=vec2(p.x,1.0)/horizon;
-  float lane=abs(abs(road.x)-.65);
-  col+=ink(lane,.018,u_c1)*step(p.y,0.0)*.3;
-  col+=u_c3*exp(-abs(p.y)*28.0)*.08;
-  return col;
-}
+
 `

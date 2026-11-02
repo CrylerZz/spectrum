@@ -71,7 +71,11 @@ export class Motion {
     const bassOnset =
       audio.bass > Math.max(0.07, this.bassFloor * 1.13) &&
       audio.bass - this.previous.bass > Math.max(0.004, dt * 0.65)
-    const hit = !this.liveMode && this.hitCooldown === 0 && (beat || bassOnset)
+    // With a calibrated detector, its threshold and spacing are authoritative.
+    const hit =
+      !this.liveMode &&
+      this.hitCooldown === 0 &&
+      (beat || (settings.beatSource === undefined && bassOnset))
     this.impact *= Math.exp(-dt * 7)
     this.flash *= Math.exp(-dt * 32)
     this.explosion *= Math.exp(-dt * 3.2)
@@ -81,7 +85,7 @@ export class Motion {
       this.impact = 0.7 + energy * 0.8
       this.flash = 1
       this.hitAge = 0
-      this.hitCooldown = 0.16
+      this.hitCooldown = Math.min(0.16, (settings.beatInterval ?? 220) / 1000)
       this.springVelocity = 16 + energy * 12
     }
     // Damped physical spring: forward punch, backwards recoil, then rest.
@@ -97,7 +101,7 @@ export class Motion {
           ? 'audio'
           : 'hybrid'
         : (settings[`${key}Mode`] ?? 'hybrid')
-      const source = automatic ? 'bass' : (settings[`${key}Source`] ?? 'bass')
+      const source = automatic ? 'beat' : (settings[`${key}Source`] ?? 'bass')
       const value = audio[source] || 0
       this.cooldowns[i] = Math.max(0, this.cooldowns[i] - dt)
       const onset =
@@ -107,18 +111,27 @@ export class Motion {
             (this.previous[source] <= threshold ||
               value - this.previous[source] > Math.max(0.006, dt * 1.1) ||
               (source === 'bass' && (beat || bassOnset)))
+      const tunnelTravel =
+        automatic && !this.liveMode && i === 2 && [1, 32].includes(settings.scene)
       if (!this.liveMode && mode !== 'continuous' && onset && this.cooldowns[i] === 0) {
-        this.velocities[i] = Math.min(12, this.velocities[i] + strength * (1 + value * 3))
-        this.cooldowns[i] = 0.12
+        const impulse = strength * (automatic ? 0.6 + value * 0.7 : 1 + value * 3)
+        this.velocities[i] = automatic
+          ? Math.max(this.velocities[i], Math.min(tunnelTravel ? 2 : 6, impulse))
+          : Math.min(12, this.velocities[i] + impulse)
+        this.cooldowns[i] = automatic ? (settings.beatInterval ?? 220) / 1000 : 0.12
       }
       if (!this.liveMode && mode === 'continuous') this.velocities[i] = 0
       // Analytic exponential integral keeps the impulse distance stable across frame rates.
-      const distance = this.velocities[i] * (1 - decay) * (0.035 + inertia * 1.4)
+      const tau = tunnelTravel ? 0.12 : 0.035 + inertia * 1.4
+      const channelDecay = tunnelTravel ? Math.exp(-dt / tau) : decay
+      const distance = this.velocities[i] * (1 - channelDecay) * tau
+      const travelScale = tunnelTravel ? (settings.tunnelTravel ?? 0.35) : 1
       this.phases[i] +=
         ((mode === 'audio' && !this.liveMode ? 0 : dt) + distance) *
         settings.speed *
+        travelScale *
         (1 + this.boost * 2.5)
-      this.velocities[i] *= decay
+      this.velocities[i] *= channelDecay
       if (this.velocities[i] < 0.001) this.velocities[i] = 0
     })
     Object.assign(this.previous, audio)

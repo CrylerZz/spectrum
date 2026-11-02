@@ -5,7 +5,7 @@ const fs = require('node:fs'),
   path = require('node:path'),
   assert = require('node:assert/strict'),
   { spawn } = require('node:child_process')
-const url = process.env.SPECTRUM_URL || 'http://127.0.0.1:5174'
+const url = process.env.SPECTRUM_URL || 'http://127.0.0.1:5173'
 const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'spectrum-test-'))
 const chrome = spawn(
   process.env.CHROME_PATH || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
@@ -100,6 +100,41 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
     await sleep(200)
   }
   assert.equal(await ev('orbitalTest.renderer.programs.size'), allScenes.length)
+  if (process.argv.includes('--prisms-only')) {
+    const signatures = []
+    for (const scene of allScenes.filter((scene) => scene.id >= 70)) {
+      const brightness = []
+      for (let level = 1; level <= 5; level++) {
+        const stats = await ev(`(() => {
+          Object.assign(orbitalTest.settings, {scene:${scene.id}, prismLevel:${level}, prismSignal:[0,.72,.72,.57], transition:0, frozen:true, dynamicMix:false});
+          orbitalTest.renderer.motion.phases=[.4,1.2,.6];
+          orbitalTest.frame();
+          const gl=orbitalTest.renderer.gl, pixels=new Uint8Array(gl.drawingBufferWidth*gl.drawingBufferHeight*4);
+          gl.readPixels(0,0,gl.drawingBufferWidth,gl.drawingBufferHeight,gl.RGBA,gl.UNSIGNED_BYTE,pixels);
+          let sum=0, lit=0;
+          for(let i=0;i<pixels.length;i+=4) {const light=pixels[i]+pixels[i+1]+pixels[i+2];sum+=light;if(light>60)lit++;}
+          return {sum,lit,error:gl.getError()};
+        })()`)
+        assert.equal(stats.error, 0)
+        assert.ok(stats.sum > 0, `${scene.name} level ${level} is visible`)
+        brightness.push(stats.sum)
+        if (level === 1 || level === 5) {
+          const shot = await call('Page.captureScreenshot', { format: 'png' }, s)
+          fs.writeFileSync(`/tmp/prism-${scene.id}-${level}.png`, Buffer.from(shot.data, 'base64'))
+        }
+      }
+      assert.ok(
+        brightness[4] > brightness[0] * 1.5,
+        `${scene.name}: stronger build has visibly more light`,
+      )
+      assert.equal(new Set(brightness).size, 5, 'Five distinct intensities')
+      signatures.push(brightness[4])
+      console.log(`PASS: ${scene.name} five visible levels, brightness ${brightness.join(', ')}`)
+    }
+    assert.equal(new Set(signatures).size, 5, 'Five different prism compositions')
+    assert.equal(errors.length, 0, JSON.stringify(errors))
+    return
+  }
   await ev('for(let i=0;i<240;i++)orbitalTest.frame()')
   assert.equal(await ev('orbitalTest.renderer.gl.getError()'), 0)
   let shot = await call('Page.captureScreenshot', { format: 'png' }, s)

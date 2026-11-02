@@ -1,19 +1,26 @@
+import { calibrationDefaults, cleanCalibration } from '../audio/calibration.js'
+
 export const scenes = [
   { id: 0, name: 'Orbital', tag: 'ADN original · relief psychédélique', type: 'orbital' },
   { id: 1, name: 'Vortex', tag: 'Tunnel · cubes 3D', type: 'tunnel' },
-  { id: 2, name: 'Filaments', tag: 'Rubans · entrelacs lumineux', type: 'aurora' },
-  { id: 3, name: 'Mandala', tag: 'Couronnes 3D · relief mobile', type: 'mandala' },
   { id: 4, name: 'Plasma', tag: 'Turbulence · décharges', type: 'liquid' },
-  { id: 5, name: 'Dust', tag: 'Essaim 3D · trois bras', type: 'stars' },
   { id: 6, name: 'Orbital Overdrive', tag: 'ADN · surcharge psychédélique', type: 'orbital' },
-  { id: 7, name: 'Réacteur', tag: 'Chambre 3D · arcs électriques', type: 'reactor' },
   { id: 8, name: 'Prisme', tag: 'Cristaux · kaléidoscope', type: 'prism' },
-  { id: 9, name: 'Onde de choc', tag: 'Membrane 3D · propagation', type: 'shock' },
-  { id: 10, name: 'Hélice', tag: 'ADN · nœud 3D', type: 'helix' },
-  { id: 11, name: 'Laser Show', tag: 'Basses / médiums / aigus', type: 'laser' },
-  { id: 12, name: 'Singularité', tag: 'Gravité · disque d’accrétion', type: 'singularity' },
-  { id: 15, name: 'Neurones', tag: 'Connexions · décharges', type: 'neural' },
-  { id: 16, name: 'Inferno', tag: 'Flammes · jets de plasma', type: 'inferno' },
+  {
+    id: 70,
+    name: 'Prisme Dentelle',
+    tag: '5 niveaux · entrelacs et filigranes',
+    type: 'prism-lace',
+  },
+  { id: 71, name: 'Prisme Couronnes', tag: '5 niveaux · anneaux polygonaux', type: 'prism-crowns' },
+  { id: 72, name: 'Prisme Éclats', tag: '5 niveaux · fragments de cristal', type: 'prism-shards' },
+  { id: 73, name: 'Prisme Spirale', tag: '5 niveaux · bras et volutes', type: 'prism-spiral' },
+  {
+    id: 74,
+    name: 'Prisme Cristal',
+    tag: '5 niveaux · facettes en profondeur',
+    type: 'prism-crystal',
+  },
   { id: 17, name: 'Gyroscope', tag: 'Orbites · précession', type: 'gyro' },
   { id: 18, name: 'Matrice', tag: 'Blocs 3D · sculpture mobile', type: 'matrix' },
   { id: 20, name: 'Plasma Cyclone', tag: 'Matière · vortex turbulent', type: 'liquid' },
@@ -22,50 +29,15 @@ export const scenes = [
   { id: 23, name: 'Prisme Fracture', tag: 'Facettes · fragmentation', type: 'crystal' },
   { id: 25, name: 'Faille dimensionnelle', tag: 'Déchirure · monde intérieur', type: 'rift' },
   { id: 26, name: 'Métal liquide', tag: 'Chrome · pression et pointes', type: 'metal' },
-  { id: 27, name: 'Cathédrale fractale', tag: 'Arches · vertige architectural', type: 'cathedral' },
-  { id: 28, name: 'Champ magnétique', tag: 'Filaments · pôles et décharges', type: 'magnetic' },
-  { id: 29, name: 'Réacteur à fusion', tag: 'Collision · plasma et éjection', type: 'fusion' },
-  { id: 30, name: 'Prisme vivant', tag: 'Plaques · ouverture et profondeur', type: 'living-prism' },
   { id: 31, name: 'Matrix Rain', tag: 'Code · pluie en profondeur', type: 'code-rain' },
   { id: 32, name: 'Data Tunnel', tag: 'Données · traversée numérique', type: 'data-tunnel' },
   { id: 33, name: 'Circuit', tag: 'Pistes · impulsions électriques', type: 'circuit' },
-  { id: 34, name: 'Portails', tag: 'Hexagones · passage en profondeur', type: 'portals' },
   { id: 35, name: 'Interférences', tag: 'Ondes · déchirures numériques', type: 'interference' },
-  { id: 36, name: 'Cyber City', tag: 'Ville · défilement et néons', type: 'cyber-city' },
-  { id: 37, name: 'Supernova', tag: 'Éjection · rayons et onde stellaire', type: 'supernova' },
   { id: 38, name: 'Orage', tag: 'Éclairs · ramifications électriques', type: 'thunderstorm' },
-  {
-    id: 39,
-    name: 'Océan électrique',
-    tag: 'Vagues 3D · houle sur les basses',
-    type: 'electric-ocean',
-  },
   { id: 40, name: 'Dunes néon', tag: 'Relief · courbes topographiques', type: 'neon-dunes' },
-  {
-    id: 41,
-    name: 'Rubans cinétiques',
-    tag: 'Rubans 3D · entrelacs mobiles',
-    type: 'kinetic-ribbons',
-  },
-  { id: 42, name: 'Méduse', tag: 'Organique · pulsations et tentacules', type: 'jellyfish' },
-  {
-    id: 43,
-    name: 'Essaim mécanique',
-    tag: 'Cubes 3D · orbites désordonnées',
-    type: 'mechanical-swarm',
-  },
-  { id: 44, name: 'Möbius', tag: 'Ruban impossible · torsion 3D', type: 'mobius' },
-  { id: 45, name: 'Mur de caissons', tag: 'Membranes · pression des basses', type: 'speaker-wall' },
   { id: 46, name: 'Tectonique', tag: 'Plaques · failles lumineuses', type: 'tectonic' },
   { id: 47, name: 'Aurore boréale', tag: 'Rideaux · ondulations lumineuses', type: 'borealis' },
-  { id: 48, name: 'Spirographe', tag: 'Courbes 3D · géométrie mouvante', type: 'spirograph' },
-  { id: 49, name: 'Astéroïdes', tag: 'Traversée · roches en profondeur', type: 'asteroids' },
-  { id: 50, name: 'Feux d’artifice', tag: 'Frappes · gerbes de particules', type: 'fireworks' },
-  { id: 51, name: 'Chute de lumière', tag: 'Traînées · cascade en profondeur', type: 'lightfall' },
   { id: 52, name: 'Lampe à lave', tag: 'Bulles · fusion organique', type: 'lava-lamp' },
-  { id: 53, name: 'Op Art', tag: 'Spirales · illusion optique', type: 'op-art' },
-  { id: 54, name: 'Tissage', tag: 'Rubans · dessus dessous', type: 'luminous-weave' },
-  { id: 55, name: 'Compression', tag: 'Chambre 3D · murs sous pression', type: 'compression' },
   { id: 56, name: 'Nébuleuse', tag: 'Nuages · couches cosmiques', type: 'nebula' },
   {
     id: 57,
@@ -76,38 +48,6 @@ export const scenes = [
   { id: 59, name: 'Soie moirée', tag: 'Voile · points et plis lumineux', type: 'moire-silk' },
   { id: 60, name: 'Courants', tag: 'Lignes · tourbillons continus', type: 'contour-currents' },
   { id: 61, name: 'Drapés acides', tag: 'Rubans · vagues psychédéliques', type: 'acid-drapes' },
-  {
-    id: 62,
-    name: 'Kaléidoscope mécanique',
-    tag: 'Métal · symétrie en profondeur',
-    type: 'kaleido-machine',
-  },
-  {
-    id: 63,
-    name: 'Citadelle cyan',
-    tag: 'Architecture · circuits et reflets',
-    type: 'cyan-citadel',
-  },
-  {
-    id: 64,
-    name: 'Turbine industrielle',
-    tag: 'Rotor · tuyaux et métal éclairé',
-    type: 'industrial-rotor',
-  },
-  { id: 65, name: 'Machines néon', tag: 'Réacteurs · chrome et bobines', type: 'neon-engines' },
-  { id: 66, name: 'Galaxies néon', tag: 'Spirales · plongée infinie', type: 'neon-galaxies' },
-  {
-    id: 67,
-    name: 'Rosace spectrale',
-    tag: 'Dentelle · cœur incandescent',
-    type: 'spectral-rosette',
-  },
-  {
-    id: 68,
-    name: 'Octogone mécanique',
-    tag: 'Couronnes · plaques et relief',
-    type: 'octagon-machine',
-  },
   { id: 69, name: 'Abysse liquide', tag: 'Tunnel · chrome bleu et rose', type: 'liquid-abyss' },
 ]
 export const palettes = [
@@ -148,6 +88,16 @@ export const defaults = {
   scene: 0,
   palette: 0,
   ...startupMix,
+  ...calibrationDefaults,
+  prismLevel: 0, // 0 follows music; 1–5 select a composition density.
+  dynamicMix: false,
+  dynamicAmount: 0.75,
+  dynamicRelease: 1.6,
+  dynamicFlash: 0.45,
+  tunnelTravel: 0.35,
+  dynamicColorEnabled: true,
+  dynamicCalmColor: '#385b9f',
+  dynamicHotColor: '#ff167a',
   orbitalDepth: 1,
   orbitalPsy: 1,
   rotationMode: 'audio',
@@ -195,18 +145,30 @@ export function cleanSettings(input) {
     motionThreshold: [0.02, 0.8],
     transition: [0, 4],
     autoInterval: [8, 90],
+    prismLevel: [0, 5],
+    dynamicAmount: [0, 1],
+    dynamicRelease: [0.3, 4],
+    dynamicFlash: [0, 1],
+    tunnelTravel: [0, 1],
   }
   for (const [key, [min, max]] of Object.entries(limits)) {
     if (typeof input[key] === 'number' && Number.isFinite(input[key]))
       out[key] = Math.min(max, Math.max(min, input[key]))
   }
+  Object.assign(out, cleanCalibration(input))
   out.scene = Math.round(out.scene)
   // Never reuse retired IDs: old presets keep their palettes and all other settings.
-  out.scene = { 13: 8, 14: 9, 19: 20, 24: 17, 58: 11 }[out.scene] ?? out.scene
+  out.scene = { 13: 8, 14: 0, 19: 20, 24: 17, 58: 0 }[out.scene] ?? out.scene
   if (!scenes.some((scene) => scene.id === out.scene)) out.scene = 0
+  for (const key of ['dynamicCalmColor', 'dynamicHotColor'])
+    if (typeof input[key] === 'string' && /^#[0-9a-f]{6}$/i.test(input[key]))
+      out[key] = input[key].toLowerCase()
+  out.prismLevel = Math.round(out.prismLevel)
   out.palette = Math.round(out.palette)
   for (const key of [
     'auto',
+    'dynamicMix',
+    'dynamicColorEnabled',
     'ring',
     'dna',
     'grid',

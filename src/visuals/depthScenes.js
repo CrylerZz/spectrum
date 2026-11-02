@@ -5,11 +5,7 @@ vec3 spin3(vec3 v, vec2 angle) {
   v.yz=turn(angle.y)*v.yz;
   return v;
 }
-vec2 project3(vec3 v) { return v.xy*2.0/max(.3,v.z+4.0); }
-vec3 stroke3(vec2 p, vec3 a, vec3 b, vec3 c, float width) {
-  float z=max(.4,(a.z+b.z)*.5+4.0);
-  return ink(segment(p,project3(a),project3(b)),width*2.0/z,c)*min(1.3,3.0/z);
-}
+
 vec4 cubeHit(vec2 p, vec3 center, vec3 size, vec2 angle, vec3 c) {
   vec3 ro=spin3(vec3(0,0,-4)-center,angle);
   vec3 rd=spin3(normalize(vec3(p,2.0)),angle);
@@ -81,56 +77,7 @@ vec3 vortexDepth(vec2 p) {
   color+=u_c3*specular*(.18+surface.y*.3);
   return color*exp(-distance*.055);
 }
-vec3 mandalaDepth(vec2 p) {
-  vec3 col=vec3(0);
-  for(int layer=0;layer<4;layer++) {
-    float f=float(layer), petals=5.0+f*2.0;
-    vec2 tilt=vec2(.35*sin(u_motion.y*.3+f),.55*cos(u_motion.y*.22+f*1.6));
-    for(int j=0;j<40;j++) {
-      float a=float(j)*TAU/40.0, b=(float(j)+1.0)*TAU/40.0;
-      float ra=.55+f*.3+(.1+.08*u_audio.y)*cos(a*petals);
-      float rb=.55+f*.3+(.1+.08*u_audio.y)*cos(b*petals);
-      float rot=u_motion.x*(mod(f,2.0)*2.0-1.0)*.35;
-      vec3 va=spin3(vec3(vec2(cos(a+rot),sin(a+rot))*ra,.25*sin(a*3.0+u_motion.y+f)),tilt);
-      vec3 vb=spin3(vec3(vec2(cos(b+rot),sin(b+rot))*rb,.25*sin(b*3.0+u_motion.y+f)),tilt);
-      va.z+=f*.3-u_kick.x*(.15+f*.12); vb.z+=f*.3-u_kick.x*(.15+f*.12);
-      col+=stroke3(p,va,vb,tint(f*1.5+a*.2),.009);
-      if(mod(float(j),5.0)<.5) col+=stroke3(p,va,va*.65+vec3(0,0,.35),u_c3,.004)*.6;
-    }
-  }
-  return col;
-}
-vec3 dustSwarm(vec2 p) {
-  vec3 col=vec3(0);
-  for(int i=0;i<96;i++) {
-    float f=float(i), seed=hash(vec2(f,5));
-    if(seed> .35+u_settings.y*.65) continue;
-    float arm=mod(f,3.0)*TAU/3.0;
-    float theta=f*.37+u_motion.x*.35+u_motion.z*.3;
-    float radius=.35+seed*1.5+u_impact*.15;
-    vec3 point=vec3(cos(theta+arm)*radius,sin(theta+arm)*radius*.7,sin(theta*.7+arm)*1.5);
-    point=spin3(point,vec2(u_motion.y*.13,.45));
-    vec3 old=point-vec3(-sin(theta+arm),cos(theta+arm)*.7,cos(theta*.7+arm)*.7)*(.07+u_impact*.13);
-    col+=stroke3(p,old,point,tint(arm+seed*3.0),.014+seed*.018);
-  }
-  return col;
-}
-vec3 neuralPoint(float f) {
-  float a=f*2.399, radius=1.1+.3*sin(f*1.7+u_motion.y*.2);
-  return spin3(vec3(cos(a)*radius,sin(a)*radius,sin(f*1.31)*1.45),vec2(u_motion.x*.23,u_motion.y*.16));
-}
-vec3 neuralDepth(vec2 p) {
-  vec3 col=vec3(0);
-  for(int i=0;i<22;i++) {
-    float f=float(i); vec3 a=neuralPoint(f), b=neuralPoint(mod(f+5.0,22.0));
-    float signal=fract(u_motion.z*.6+f*.17);
-    vec3 packet=mix(a,b,signal);
-    col+=stroke3(p,a,b,tint(f*.5),.004)*.4;
-    col+=ink(length(p-project3(a)),.012/(a.z+4.0)*3.0,tint(f*.5))*.8;
-    col+=ink(length(p-project3(packet)),.015,u_c3)*( .4+u_audio.z+u_impact*.2);
-  }
-  return col;
-}
+
 vec3 latticeDepth(vec2 p) {
   vec3 col=vec3(0); float nearest=10000.0;
   for(int i=0;i<25;i++) {

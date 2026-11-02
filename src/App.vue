@@ -1,6 +1,10 @@
 <script setup>
 import { computed, nextTick, onMounted, onBeforeUnmount, reactive, ref, watch } from 'vue'
+import { AutoCalibration } from './audio/AutoCalibration.js'
+import AudioCalibration from './components/AudioCalibration.vue'
 import { AudioEngine, audioError } from './audio/AudioEngine'
+import { PrismDynamics, prismLevels } from './visuals/PrismDynamics.js'
+import { DynamicMix, dynamicControls } from './visuals/DynamicMix.js'
 import { Renderer } from './visuals/Renderer'
 import { defaults, startupMix, cleanSettings, scenes, palettes } from './visuals/scenes'
 
@@ -13,6 +17,16 @@ try {
 restored = { ...restored, ...startupMix }
 const settings = reactive({ ...restored })
 const engineSettings = { ...restored }
+const dynamicMix = new DynamicMix()
+const prismDynamics = new PrismDynamics()
+const prismState = reactive({ level: 0 })
+const isAdaptivePrism = computed(() => settings.scene >= 70 && settings.scene <= 74)
+const visualMixState = reactive({ energy: 0, values: { ...restored } })
+const dynamicActive = computed(() => settings.dynamicMix && !settings.liveMode)
+function dynamicValue(key, unit = '%') {
+  const value = visualMixState.values[key] ?? settings[key]
+  return unit === '%' ? `${Math.round(value * 100)}%` : `${value.toFixed(2)}${unit}`
+}
 const canvas = ref(null),
   stage = ref(null),
   audioInput = ref(null),
@@ -82,6 +96,70 @@ const audio = new AudioEngine((reason) => {
   }
   if (reason === 'file-ended') playing.value = false
 })
+const autoCalibrator = new AutoCalibration()
+const autoCalibration = reactive({
+  enabled: false,
+  progress: 0,
+  message: 'Prêt : lance ta musique, puis active la détection automatique.',
+})
+let calibrationSource = null
+let calibrationApplied = false
+function stopAutoCalibration() {
+  if (!autoCalibration.enabled) return
+  autoCalibration.enabled = false
+  autoCalibration.progress = 0
+  autoCalibration.message = 'Réglage manuel · les dernières valeurs sont conservées.'
+  autoCalibrator.reset()
+}
+function toggleAutoCalibration() {
+  if (autoCalibration.enabled) {
+    stopAutoCalibration()
+    return
+  }
+  autoCalibrator.reset()
+  calibrationSource = audio.features
+  calibrationApplied = false
+  autoCalibration.enabled = true
+  autoCalibration.progress = 0
+  autoCalibration.message = 'En attente de musique…'
+}
+function calibrateAudio(dt) {
+  if (!autoCalibration.enabled) return
+  if (calibrationSource !== audio.features) {
+    autoCalibrator.reset()
+    calibrationSource = audio.features
+    calibrationApplied = false
+  }
+  const active =
+    audio.kind !== 'idle' &&
+    audio.context?.state === 'running' &&
+    !(audio.kind === 'file' && audio.element.paused)
+  if (!active) {
+    autoCalibrator.reset()
+    autoCalibration.progress = 0
+    autoCalibration.message = 'En attente de musique · lance ou reprends la lecture.'
+    return
+  }
+  const patch = autoCalibrator.update(
+    audio.frequency,
+    audio.decibels,
+    dt,
+    audio.features.sampleRate,
+    audio.features.fftSize,
+    engineSettings,
+  )
+  if (patch && Object.keys(patch).length) {
+    Object.assign(settings, patch)
+    calibrationApplied = true
+  }
+  autoCalibration.progress = Math.round(autoCalibrator.progress * 100) / 100
+  autoCalibration.message =
+    autoCalibrator.waiting && !patch
+      ? 'Signal trop faible · en attente de musique.'
+      : calibrationApplied
+        ? 'Réglages appliqués · adaptation en direct active.'
+        : 'Analyse en cours · laisse jouer la musique pendant 6 secondes.'
+}
 const graphicsLoading = reactive({
   active: true,
   completed: 0,
@@ -490,8 +568,10 @@ function keydown(event) {
       return
     }
   }
-  if (/^[1-9]$/.test(key)) selectScene(Number(key) - 1)
-  if (key === '0') selectScene(9)
+  if (/^[0-9]$/.test(key)) {
+    const scene = scenes[(Number(key) + 9) % 10]
+    if (scene) selectScene(scene.id)
+  }
   if (key === ' ') {
     event.preventDefault()
     settings.frozen = !settings.frozen
@@ -520,7 +600,17 @@ function processFrame(now) {
     outputConnected.value = now - lastPacket < 3000 && lastPacket > 0
     if (!outputConnected.value) renderer?.motion.setBoost(false, engineSettings)
   } else {
-    values = audio.update(dt, now / 1000, engineSettings.sensitivity, engineSettings.bassGain)
+    values = audio.update(
+      dt,
+      now / 1000,
+      engineSettings.sensitivity,
+      engineSettings.bassGain,
+      engineSettings,
+    )
+    calibrateAudio(dt)
+    Object.assign(engineSettings, dynamicMix.update(dt, values, settings))
+    prismDynamics.update(dt, values, settings.frozen)
+    engineSettings.prismSignal = [prismDynamics.level, ...prismDynamics.bands]
     spectrum = audio.features.spectrum
     if (
       settings.auto &&
@@ -566,6 +656,9 @@ function processFrame(now) {
   }
   if (!document.hidden) renderer?.render(dt, values, spectrum)
   if (now - uiTime > 100) {
+    prismState.level = settings.prismLevel > 0 ? (settings.prismLevel - 1) / 4 : prismDynamics.level
+    visualMixState.energy = dynamicMix.energy
+    Object.assign(visualMixState.values, engineSettings)
     Object.assign(stats, {
       ...values,
       fps: renderer?.fps || 0,
@@ -629,6 +722,21 @@ onMounted(() => {
   if (import.meta.env.DEV)
     window.__spectrumMetrics = () => ({
       ...stats,
+      prism: {
+        level:
+          engineSettings.prismLevel > 0
+            ? (engineSettings.prismLevel - 1) / 4
+            : (engineSettings.prismSignal?.[0] ?? 0),
+        bands: engineSettings.prismSignal?.slice(1),
+      },
+      visualMix: {
+        enabled: engineSettings.dynamicMix,
+        energy: dynamicMix.energy,
+        colors: engineSettings.dynamicColors,
+        values: Object.fromEntries(
+          Object.keys(dynamicControls).map((key) => [key, engineSettings[key]]),
+        ),
+      },
       time: renderer?.time,
       contextLost: renderer?.lost,
       renderedScene: renderer?.scene,
@@ -840,10 +948,18 @@ onBeforeUnmount(() => {
             </div>
             <div class="bpm-row">
               <span class="beat-dot" :style="{ opacity: 0.2 + stats.beat * 0.8 }"></span
-              ><strong>{{ source === 'demo' ? '124' : stats.bpm || '—' }}</strong
-              ><span>BPM {{ source === 'demo' ? 'DÉMO' : 'ESTIMÉS' }}</span>
+              ><strong>{{ stats.bpm || '—' }}</strong
+              ><span>BPM ESTIMÉS</span>
             </div>
           </details>
+          <AudioCalibration
+            :settings="settings"
+            :levels="stats"
+            :automatic="autoCalibration"
+            @toggle-auto="toggleAutoCalibration"
+            @manual="stopAutoCalibration"
+            @change="Object.assign(settings, $event)"
+          />
           <p class="motion-hint">
             Branche ta musique : les frappes déclenchent les impacts et les flashs automatiquement.
           </p>
@@ -998,7 +1114,7 @@ onBeforeUnmount(() => {
               </div>
               <div class="scene-caption">
                 <strong>{{ scene.name }}</strong
-                ><kbd v-if="scene.id < 10">{{ (scene.id + 1) % 10 }}</kbd>
+                ><kbd v-if="sceneIndex < 10">{{ (sceneIndex + 1) % 10 }}</kbd>
               </div>
             </button>
           </div>
@@ -1103,9 +1219,180 @@ onBeforeUnmount(() => {
             </p>
           </template>
         </section>
+        <section v-if="isAdaptivePrism" class="control-group prism-controls">
+          <div class="section-label">PRISME · 5 NIVEAUX</div>
+          <label class="prism-mode"
+            >Progression
+            <select v-model.number="settings.prismLevel" aria-label="Niveau du Prisme">
+              <option :value="0">Automatique · suit la musique</option>
+              <option v-for="(name, index) in prismLevels" :key="name" :value="index + 1">
+                {{ index + 1 }} · {{ name }}
+              </option>
+            </select>
+          </label>
+          <div
+            class="prism-steps"
+            role="meter"
+            aria-label="Densité du Prisme"
+            aria-valuemin="1"
+            aria-valuemax="5"
+            :aria-valuenow="1 + Math.round(prismState.level * 4)"
+          >
+            <i
+              v-for="n in 5"
+              :key="n"
+              :class="{ active: n <= 1 + Math.round(prismState.level * 4) }"
+            ></i>
+          </div>
+          <p class="motion-hint">
+            {{ prismLevels[Math.round(prismState.level * 4)] }} · Les médiums dessinent les
+            facettes, les aigus la dentelle ; les basses ouvrent les grandes couches. La densité
+            évolue en fondu, même sans Mix auto.
+          </p>
+        </section>
+        <section class="control-group dynamic-mix" :class="{ 'dynamic-enabled': dynamicActive }">
+          <label class="live-switch">
+            <span>MIX AUTO <small>Suit l’énergie de la musique</small></span>
+            <input
+              v-model="settings.dynamicMix"
+              type="checkbox"
+              role="switch"
+              aria-label="Activer le mix visuel automatique"
+            />
+          </label>
+          <template v-if="settings.dynamicMix">
+            <p class="motion-hint" v-if="settings.liveMode">
+              En pause pendant le mode live : tes commandes gardent la main.
+            </p>
+            <template v-else>
+              <div
+                class="dynamic-energy"
+                role="meter"
+                aria-label="Énergie du mix automatique"
+                aria-valuemin="0"
+                aria-valuemax="100"
+                :aria-valuenow="Math.round(visualMixState.energy * 100)"
+              >
+                <span>{{
+                  settings.frozen
+                    ? 'Figé'
+                    : visualMixState.energy > 0.7
+                      ? 'Ça tape'
+                      : visualMixState.energy > 0.3
+                        ? 'En mouvement'
+                        : 'Calme'
+                }}</span>
+                <div><i :style="{ width: `${visualMixState.energy * 100}%` }"></i></div>
+                <output>{{ Math.round(visualMixState.energy * 100) }}%</output>
+              </div>
+              <div class="sliders">
+                <label
+                  ><span
+                    >Amplitude
+                    <output>{{ Math.round(settings.dynamicAmount * 100) }}%</output></span
+                  >
+                  <input
+                    v-model.number="settings.dynamicAmount"
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.01"
+                    aria-label="Amplitude du mix automatique"
+                  />
+                </label>
+                <label
+                  ><span
+                    >Retour au calme
+                    <output>{{ settings.dynamicRelease.toFixed(1) }} s</output></span
+                  >
+                  <input
+                    v-model.number="settings.dynamicRelease"
+                    type="range"
+                    min="0.3"
+                    max="4"
+                    step="0.1"
+                    aria-label="Retour au calme du mix automatique"
+                  />
+                </label>
+              </div>
+              <div class="sliders">
+                <label
+                  ><span
+                    >Flashs auto
+                    <output>{{ Math.round(settings.dynamicFlash * 100) }}%</output></span
+                  >
+                  <input
+                    v-model.number="settings.dynamicFlash"
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.01"
+                    aria-label="Dosage des flashs automatiques"
+                  />
+                </label>
+                <label v-if="[1, 32].includes(settings.scene)"
+                  ><span
+                    >Avancée du tunnel
+                    <output>{{ Math.round(settings.tunnelTravel * 100) }}%</output></span
+                  >
+                  <input
+                    v-model.number="settings.tunnelTravel"
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.01"
+                    aria-label="Avancée du tunnel"
+                    :disabled="settings.advancedMotion"
+                  />
+                  <small class="motion-hint">{{
+                    settings.advancedMotion
+                      ? 'Pilotée par tes réglages manuels de déplacement.'
+                      : 'Dérive lente et poussées brèves sur les frappes.'
+                  }}</small>
+                </label>
+              </div>
+              <label class="rave-toggle"
+                ><input v-model="settings.dynamicColorEnabled" type="checkbox" /> Couleurs
+                auto</label
+              >
+              <div v-if="settings.dynamicColorEnabled" class="dynamic-colors">
+                <label
+                  >Calme<input
+                    v-model="settings.dynamicCalmColor"
+                    type="color"
+                    aria-label="Couleur des passages calmes"
+                /></label>
+                <label
+                  >Ça tabasse<input
+                    v-model="settings.dynamicHotColor"
+                    type="color"
+                    aria-label="Couleur des passages intenses"
+                /></label>
+                <div
+                  class="dynamic-color-preview"
+                  :style="{
+                    background:
+                      visualMixState.values.dynamicColors?.[0] || settings.dynamicCalmColor,
+                  }"
+                  aria-label="Couleur actuelle du mix"
+                ></div>
+              </div>
+              <p class="motion-hint">
+                Les passages calmes sont plus sombres. Sur les frappes fortes, l’auto pousse le
+                relief, le psychédélisme et les couleurs. Flashs auto à zéro désactive les flashs
+                ajoutés ; tes flashs manuels restent réglables en Mode Rave.
+              </p>
+            </template>
+          </template>
+        </section>
         <div class="control-group palette-group">
           <div class="section-label">
-            PALETTE <span>{{ palettes[settings.palette].name }}</span>
+            PALETTE
+            <span>{{
+              dynamicActive && settings.dynamicColorEnabled
+                ? 'Couleurs auto'
+                : palettes[settings.palette].name
+            }}</span>
           </div>
           <div class="palette-options">
             <button
@@ -1130,6 +1417,11 @@ onBeforeUnmount(() => {
               :class="{
                 dimmed: control.orbital && !isOrbital,
               }"
+              :title="
+                control.orbital && !isOrbital
+                  ? 'Disponible sur Orbital et Orbital Overdrive'
+                  : undefined
+              "
               ><span
                 >{{ control.name
                 }}<output
@@ -1146,9 +1438,22 @@ onBeforeUnmount(() => {
                 :max="control.max"
                 step=".01"
                 :disabled="control.orbital && !isOrbital"
-            /></label>
+                :aria-label="control.name"
+              /><small
+                v-if="
+                  dynamicActive && dynamicControls[control.key] && (!control.orbital || isOrbital)
+                "
+                class="dynamic-effective"
+                >En direct : {{ dynamicValue(control.key, control.unit) }}</small
+              ></label
+            >
           </div>
         </div>
+        <p v-if="!isOrbital" class="motion-hint orbital-settings-hint">
+          Les deux réglages Orbital sont réservés à Orbital et Orbital Overdrive. Pour
+          {{ currentScene.name }}, utilise la profondeur et le psychédélisme du Mode Rave
+          ci-dessous.
+        </p>
         <div v-if="settings.scene !== 0" class="control-group motion-controls">
           <div class="section-label">
             MODE RAVE <span>{{ currentScene.name }}</span>
@@ -1168,7 +1473,11 @@ onBeforeUnmount(() => {
                 min="0"
                 :max="control.max"
                 step=".01"
+                :aria-label="control.name"
               />
+              <small v-if="dynamicActive && dynamicControls[control.key]" class="dynamic-effective"
+                >En direct : {{ dynamicValue(control.key) }}</small
+              >
             </label>
           </div>
           <label class="rave-toggle"

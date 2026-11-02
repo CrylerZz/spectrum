@@ -116,6 +116,30 @@ let debugEval
   fs.writeFileSync('/tmp/spectrum-desktop.png', Buffer.from(shot.data, 'base64'))
   results.push({ check: 'demo + real Web Audio analysis', metrics })
   console.log('PASS: shaders compiled and demo audio analysed')
+  await ev(
+    `Array.from(document.querySelectorAll('.scene-card')).find(card=>card.textContent.includes('Prisme Dentelle')).click()`,
+  )
+  await sleep(1800)
+  assert.ok(await ev("!!document.querySelector('.prism-controls')"))
+  for (let level = 1; level <= 5; level++) {
+    await ev(
+      `(() => {const input=document.querySelector('[aria-label="Niveau du Prisme"]'); input.value='${level}';input.dispatchEvent(new Event('change',{bubbles:true}));})()`,
+    )
+    await sleep(150)
+    assert.equal((await ev('window.__spectrumMetrics()')).prism.level, (level - 1) / 4)
+  }
+  await sleep(500)
+  assert.equal(await ev("JSON.parse(localStorage.getItem('spectrum.settings.v1')).prismLevel"), 5)
+  await ev(
+    `(() => {const input=document.querySelector('[aria-label="Niveau du Prisme"]');input.value='0';input.dispatchEvent(new Event('change',{bubbles:true}));})()`,
+  )
+  await sleep(200)
+  const prism = (await ev('window.__spectrumMetrics()')).prism
+  assert.ok(prism.level >= 0 && prism.level <= 1)
+  await ev("document.querySelectorAll('.scene-card')[0].click()")
+  await sleep(1800)
+  console.log('PASS: five Prism levels, automatic audio progression and saved level')
+
   // Shortcuts must still work after a scene button receives keyboard focus.
   await ev("document.querySelectorAll('.scene-card')[0].focus()")
   await call('Input.dispatchKeyEvent', { type: 'keyDown', key: '2', code: 'Digit2' }, s)
@@ -135,6 +159,205 @@ let debugEval
   assert.ok(await ev('!!document.fullscreenElement'))
   await ev('document.exitFullscreen()')
   console.log('PASS: focused-button shortcuts, help focus and native fullscreen')
+  // Visual automation changes effective rendering, while preserving the user's sliders.
+  const baseIntensity = await ev(`Number(document.querySelector('[aria-label="Intensité"]').value)`)
+  const baseSpeed = await ev(`Number(document.querySelector('[aria-label="Mouvement"]').value)`)
+  await ev(`document.querySelector('[aria-label="Activer le mix visuel automatique"]').click()`)
+  await sleep(2200)
+  const strongMix = (await ev('window.__spectrumMetrics()')).visualMix
+  assert.ok(strongMix.energy > 0.15, JSON.stringify(strongMix))
+  assert.equal(strongMix.colors.length, 3)
+  assert.deepEqual(
+    await ev(
+      `(() => { const gl = document.querySelector('canvas').getContext('webgl'); const program = gl.getParameter(gl.CURRENT_PROGRAM); return Array.from(gl.getUniform(program, gl.getUniformLocation(program, 'u_dynamic'))); })()`,
+    ),
+    [0.75, 1],
+  )
+  assert.ok(await ev("document.querySelectorAll('.dynamic-effective').length >= 4"))
+  await ev("document.querySelector('.dynamic-mix').scrollIntoView({block:'center'})")
+  shot = await call('Page.captureScreenshot', { format: 'png' }, s)
+  fs.writeFileSync('/tmp/spectrum-dynamic-mix.png', Buffer.from(shot.data, 'base64'))
+  await ev("document.querySelector('.transport-play').click()")
+  await sleep(4500)
+  const calmMix = (await ev('window.__spectrumMetrics()')).visualMix
+  assert.notDeepEqual(
+    calmMix.colors,
+    strongMix.colors,
+    'Automatic colour changes with musical energy',
+  )
+  assert.ok(calmMix.energy < strongMix.energy, JSON.stringify({ strongMix, calmMix }))
+  assert.ok(calmMix.values.speed < strongMix.values.speed)
+  assert.equal(
+    await ev(`Number(document.querySelector('[aria-label="Intensité"]').value)`),
+    baseIntensity,
+  )
+  assert.equal(
+    await ev("JSON.parse(localStorage.getItem('spectrum.settings.v1')).intensity"),
+    baseIntensity,
+  )
+  assert.equal(
+    await ev("JSON.parse(localStorage.getItem('spectrum.settings.v1')).dynamicMix"),
+    true,
+  )
+  await ev(`document.querySelector('[aria-label="Activer le mix visuel automatique"]').click()`)
+  await sleep(200)
+  assert.equal((await ev('window.__spectrumMetrics()')).visualMix.values.speed, baseSpeed)
+  await ev("document.querySelector('.transport-play').click(); window.scrollTo(0,0)")
+  console.log(
+    'PASS: dynamic visual mix follows sound, calms on pause and preserves manual settings',
+  )
+  // Independent band buttons support every combination, remember tuning and select an active beat source.
+  await ev("document.querySelector('.audio-calibration').open = true")
+  for (let mask = 0; mask < 8; mask++) {
+    await ev(`(() => {
+      const buttons = document.querySelectorAll('.band-toggles button');
+      buttons.forEach((button, index) => {
+        if ((button.getAttribute('aria-pressed') === 'true') !== !!(${mask} & (1 << index))) button.click();
+      });
+    })()`)
+    await sleep(200)
+    const bandLevels = await ev('window.__spectrumMetrics()')
+    for (const [index, key] of ['bass', 'mid', 'high'].entries()) {
+      assert.equal(
+        await ev(`document.querySelectorAll('.calibration-band')[${index}].disabled`),
+        !(mask & (1 << index)),
+      )
+      if (!(mask & (1 << index))) assert.equal(bandLevels[key], 0, `${key} is muted`)
+    }
+    if (mask === 0) assert.equal(bandLevels.level, 0)
+  }
+  await ev("document.querySelectorAll('.band-toggles button')[1].click()")
+  await sleep(500)
+  assert.equal(
+    await ev("JSON.parse(localStorage.getItem('spectrum.settings.v1')).midEnabled"),
+    false,
+  )
+  await ev(
+    "document.querySelectorAll('.band-toggles button')[1].click(); document.querySelector('.calibration-reset').click()",
+  )
+  console.log('PASS: all eight band combinations and persisted independent switches')
+  // Automatic calibration observes the live stream, applies a result, and can be stopped.
+  await ev(
+    "document.querySelector('.audio-calibration').open = true; document.querySelector('.calibration-auto').click()",
+  )
+  assert.equal(
+    await ev("document.querySelector('.calibration-auto').getAttribute('aria-pressed')"),
+    'true',
+  )
+  let autoApplied = false
+  for (let i = 0; i < 120; i++) {
+    await sleep(200)
+    autoApplied = await ev(
+      "document.querySelector('.audio-calibration [role=status]').textContent.includes('Réglages appliqués')",
+    )
+    if (autoApplied) break
+  }
+  assert.ok(autoApplied, 'Automatic calibration applies real audio analysis')
+  await sleep(500)
+  const autoSettings = await ev("JSON.parse(localStorage.getItem('spectrum.settings.v1'))")
+  assert.ok(autoSettings.bassLowHz >= 20 && autoSettings.bassHighHz > autoSettings.bassLowHz)
+  assert.ok(autoSettings.bassTrim > 0 && autoSettings.bassTrim <= 4)
+  await ev("document.querySelector('.calibration-auto').click()")
+  assert.equal(
+    await ev("document.querySelector('.calibration-auto').getAttribute('aria-pressed')"),
+    'false',
+  )
+  await ev(
+    "document.querySelector('.calibration-reset').click(); document.querySelector('.calibration-auto').click()",
+  )
+  // Live calibration must affect analysis and persist without stealing numeric shortcuts.
+  await ev("document.querySelector('.audio-calibration').open = true")
+  await ev(`(() => {
+    const field = document.querySelector('[aria-label="Médiums : fréquence minimum en Hz"]');
+    field.focus();
+    field.value = ''; field.dispatchEvent(new Event('input', { bubbles: true }));
+  })()`)
+  await sleep(350)
+  assert.equal(
+    await ev(`document.querySelector('[aria-label="Médiums : fréquence minimum en Hz"]').value`),
+    '',
+    'Empty Hz draft survives meter refresh',
+  )
+  let typed = ''
+  for (const digit of ['3', '0', '0']) {
+    await call('Input.insertText', { text: digit }, s)
+    typed += digit
+    await sleep(250)
+    assert.equal(
+      await ev(`document.querySelector('[aria-label="Médiums : fréquence minimum en Hz"]').value`),
+      typed,
+      'Typing survives live meter updates',
+    )
+  }
+  assert.equal(
+    await ev("document.querySelector('.calibration-auto').getAttribute('aria-pressed')"),
+    'false',
+    'Manual editing stops automatic tuning',
+  )
+  await sleep(500)
+  assert.equal(
+    await ev("JSON.parse(localStorage.getItem('spectrum.settings.v1')).midLowHz"),
+    300,
+    'Hz applies before leaving the field',
+  )
+  await call('Input.dispatchKeyEvent', { type: 'keyDown', key: '2', code: 'Digit2' }, s)
+  assert.ok(
+    await ev("document.querySelectorAll('.scene-card')[0].getAttribute('aria-pressed') === 'true'"),
+  )
+  await ev(`(() => {
+    const gain = document.querySelector('[aria-label="Basses : gain"]');
+    gain.value = '0'; gain.dispatchEvent(new Event('input', { bubbles: true }));
+  })()`)
+  await sleep(700)
+  assert.ok((await ev('window.__spectrumMetrics()')).bass < 0.001)
+  assert.equal(await ev("JSON.parse(localStorage.getItem('spectrum.settings.v1')).midLowHz"), 300)
+  assert.equal(await ev("JSON.parse(localStorage.getItem('spectrum.settings.v1')).bassTrim"), 0)
+  await ev("document.querySelector('.audio-calibration').scrollIntoView({block:'start'})")
+  shot = await call('Page.captureScreenshot', { format: 'png' }, s)
+  fs.writeFileSync('/tmp/spectrum-calibration-desktop.png', Buffer.from(shot.data, 'base64'))
+  await call(
+    'Emulation.setDeviceMetricsOverride',
+    { width: 390, height: 844, deviceScaleFactor: 1, mobile: false },
+    s,
+  )
+  await ev("document.querySelector('.audio-calibration').scrollIntoView({block:'start'})")
+  assert.ok(
+    await ev('document.documentElement.scrollWidth <= innerWidth'),
+    'Calibration has no mobile overflow',
+  )
+  shot = await call('Page.captureScreenshot', { format: 'png' }, s)
+  fs.writeFileSync('/tmp/spectrum-calibration-mobile.png', Buffer.from(shot.data, 'base64'))
+  if (process.argv.includes('--ui-only')) {
+    await call('Page.reload', {}, s)
+    for (let i = 0; i < 100; i++) {
+      await sleep(100)
+      if (await ev("!!document.querySelector('.audio-calibration')")) break
+    }
+    assert.equal(
+      await ev(
+        `Number(document.querySelector('[aria-label="Médiums : fréquence minimum en Hz"]').value)`,
+      ),
+      300,
+    )
+    assert.equal(
+      await ev(`Number(document.querySelector('[aria-label="Basses : gain"]').value)`),
+      0,
+    )
+  }
+  await ev("document.querySelector('.calibration-reset').click()")
+  await sleep(500)
+  assert.equal(await ev("JSON.parse(localStorage.getItem('spectrum.settings.v1')).midLowHz"), 160)
+  assert.equal(await ev("JSON.parse(localStorage.getItem('spectrum.settings.v1')).bassTrim"), 1)
+  await ev(
+    "document.querySelector('.audio-calibration').open = false; document.activeElement.blur(); window.scrollTo(0, 0)",
+  )
+  await call(
+    'Emulation.setDeviceMetricsOverride',
+    { width: 1440, height: 1100, deviceScaleFactor: 1, mobile: false },
+    s,
+  )
+  assert.equal(errors.length, 0, JSON.stringify(errors))
+  console.log('PASS: live Hz and gain edits, persistence, reset and mobile calibration layout')
   if (process.argv.includes('--ui-only')) return
   if (process.argv.includes('--live-only')) {
     await checkLive()
@@ -157,8 +380,13 @@ let debugEval
     assert.ok((await ev('window.__spectrumMetrics()')).live.explosion > 0)
     await call('Input.dispatchKeyEvent', { type: 'keyUp', key: 'l', code: 'KeyL' }, s)
     await call('Input.dispatchKeyEvent', { type: 'keyDown', key: 'u', code: 'KeyU' }, s)
-    await sleep(250)
-    assert.ok((await ev('window.__spectrumMetrics()')).live.boost > 0.5)
+    // Viewport changes can delay animation frames in headless Chrome.
+    for (let i = 0; i < 20; i++) {
+      if ((await ev('window.__spectrumMetrics()')).live.boost > 0.5) break
+      await sleep(100)
+    }
+    const boosted = (await ev('window.__spectrumMetrics()')).live
+    assert.ok(boosted.boost > 0.5, JSON.stringify(boosted))
     await ev("window.dispatchEvent(new Event('blur'))")
     assert.equal((await ev('window.__spectrumMetrics()')).live.held, false)
     await call('Input.dispatchKeyEvent', { type: 'keyUp', key: 'u', code: 'KeyU' }, s)
@@ -176,6 +404,7 @@ let debugEval
   assert.ok((await ev('window.__spectrumMetrics()')).level < 0.01)
   await ev("document.querySelector('.transport-play').click()")
   await sleep(300)
+  await ev(`document.querySelector('[aria-label="Activer le mix visuel automatique"]').click()`)
   const sceneCount = await ev("document.querySelectorAll('.scene-card').length")
   for (let scene = 0; scene < sceneCount; scene++) {
     await ev(`document.querySelectorAll('.scene-card')[${scene}].click()`)
@@ -193,6 +422,7 @@ let debugEval
     console.log(`PASS: scene ${scene + 1}/${sceneCount}`)
     results.push({ scene, metrics: await ev('window.__spectrumMetrics()') })
   }
+  await ev(`document.querySelector('[aria-label="Activer le mix visuel automatique"]').click()`)
   await ev("document.querySelectorAll('.scene-card')[0].click()")
   await sleep(1800)
   await ev("document.querySelectorAll('.performance-buttons button')[0].click()")

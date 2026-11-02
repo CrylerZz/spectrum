@@ -1,6 +1,6 @@
 # Spectrum — Live visual studio
 
-Studio local de visuels musicaux : interface Vue 3, analyse Web Audio et rendu WebGL indépendant. La scène **Orbital** reprend le cercle, les courbes ADN, la grille, les ondes et l’œil du visualiseur original. La bibliothèque comporte maintenant **65 scènes**, dont Orbital original conservé et une variante Orbital Overdrive.
+Studio local de visuels musicaux : interface Vue 3, analyse Web Audio et rendu WebGL indépendant. La scène **Orbital** reprend le cercle, les courbes ADN, la grille, les ondes et l’œil du visualiseur original. La bibliothèque comporte maintenant **33 scènes**, dont Orbital original conservé et une variante Orbital Overdrive.
 
 ## Démarrer
 
@@ -34,7 +34,7 @@ L’analyse audio et les réglages sont transmis entre les deux fenêtres avec `
 
 ## Contrôles
 
-- `1` à `9`, puis `0` : les dix premières scènes ; `→` : parcourir les trente-trois scènes. Toutes sont sélectionnables dans la galerie.
+- `1` à `9`, puis `0` : les dix premières scènes ; `→` : parcourir les 33 scènes. Toutes sont sélectionnables dans la galerie.
 - `F` : plein écran ; `Échap` : quitter le plein écran.
 - `Espace` : figer le mouvement et les données visuelles, sans arrêter la musique.
 - `B` : écran noir immédiat, sans arrêter le son.
@@ -51,48 +51,55 @@ Les réglages et jusqu’à 30 presets sont enregistrés dans le navigateur. Un 
 
 ## Scènes et commandes
 
-Vortex parcourt un cylindre courbe et tournant dont les cubes émergent des parois ; Mandala superpose des couronnes inclinées et décalées en profondeur ; Dust forme un essaim à trois bras ; Réacteur assemble une chambre de blocs qui s’étirent et se compriment avec les basses autour d’un noyau électrique ; Onde de choc déforme une membrane qui remplit le champ de vision, avec rotation en 3D ; Hélice transforme des rubans épais d’une double spirale en nœud ; Neurones projette un réseau spatial ; Matrice devient une sculpture de blocs mobiles. Plasma, Prisme, Orbital original et Gyroscope gardent leurs compositions de référence.
+Vortex parcourt un tunnel de cubes en relief ; Matrice devient une sculpture de blocs mobiles. Plasma, Prisme, Orbital original et Gyroscope gardent leurs compositions de référence.
 
-Le **Mode Rave** pilote automatiquement les scènes autres qu’Orbital original. Quatre curseurs dosent **Énergie**, **Coup de sub · profondeur**, **Psychédélisme** et **Flashs sur les frappes**. Les frappes et attaques de basses déclenchent une impulsion de profondeur avec recul amorti, des fronts lumineux et des flashs brefs. La profondeur varie aussi entre les couches du mandala, les filaments et les plans de particules. Les flashs suivent le son, sans stroboscope périodique ; leur curseur à zéro les supprime. Les transformations de perspective sont procédurales dans le shader.
+Le **Mode Rave** pilote automatiquement les scènes autres qu’Orbital original. Quatre curseurs dosent **Énergie**, **Coup de sub · profondeur**, **Psychédélisme** et **Flashs sur les frappes**. Les frappes et attaques de basses déclenchent une impulsion de profondeur avec recul amorti, des fronts lumineux et des flashs brefs. Les flashs suivent le son, sans stroboscope périodique ; leur curseur à zéro les supprime. Les transformations de perspective sont procédurales dans le shader.
 
 **Tourner uniquement sur les basses** conserve la rotation par impulsions. Les curseurs Sensibilité audio, Réponse des basses, Intensité, Mouvement, Détail et Halo restent accessibles directement. Seuls les réglages détaillés de chorégraphie sont repliés ; **Utiliser mes réglages manuels** réactive les choix de rotation, déformation, déplacement, force, inertie et seuil. Les anciens réglages manuels restent enregistrés mais ne pilotent plus le mouvement tant que cette option n'est pas activée. Les niveaux basses/médiums/aigus et BPM sont des indicateurs de lecture, désormais regroupés sous **Détails du signal audio**.
 
-Ces réglages sont communs aux nouvelles scènes, enregistrés dans les presets et transmis à la projection avec les phases de mouvement. Orbital conserve son animation d'origine. Les anciens presets gardent leurs indices de scène : Hyperdrive devient Vortex, Aurora devient Filaments, Terrain devient Mandala, Liquid devient Plasma et Stardust devient Dust.
+Ces réglages sont communs aux nouvelles scènes, enregistrés dans les presets et transmis à la projection avec les phases de mouvement. Orbital conserve son animation d'origine. Les presets des scènes retirées reviennent à Orbital, en conservant leur palette et leurs autres réglages. Les identifiants des scènes conservées restent stables.
 
-### Bibliothèque de 65 scènes
+### Bibliothèque de 33 scènes
 
-Orbital, Vortex, Filaments, Mandala, Plasma, Dust, Orbital Overdrive, Réacteur, Prisme, Onde de choc, Hélice, Laser Show, Singularité, Neurones, Inferno, Gyroscope, Matrice, Plasma Cyclone, Plasma Fission, Prisme Abyssal, Prisme Fracture, Faille dimensionnelle, Métal liquide, Cathédrale fractale, Champ magnétique, Réacteur à fusion, Prisme vivant, Matrix Rain, Data Tunnel, Circuit, Portails, Interférences et Cyber City.
+Orbital, Vortex, Plasma, Orbital Overdrive, Prisme, Prisme Dentelle, Prisme Couronnes, Prisme Éclats, Prisme Spirale, Prisme Cristal, Gyroscope, Matrice, Plasma Cyclone, Plasma Fission, Prisme Abyssal, Prisme Fracture, Faille dimensionnelle, Métal liquide, Matrix Rain, Data Tunnel, Circuit, Interférences, Orage, Dunes néon, Tectonique, Aurore boréale, Lampe à lave, Nébuleuse, Résonance rétro, Soie moirée, Courants, Drapés acides, Abysse liquide.
 
-**Orbital Overdrive** projette l'image originale sur des plans inclinés, avec des poussées d'échelle et des contours épaissis sur les frappes ; la fleur ajoutée a été retirée. **Laser Show** garde une implantation symétrique : les basses ouvrent les éventails, les médiums dirigent les nappes parallèles, les aigus allument les faisceaux fins. Des balayages continus et symétriques maintiennent le mouvement même quand une bande reste à niveau élevé. Les basses modulent l’ouverture, les médiums le glissement des nappes, les aigus le déplacement des aiguilles. Pas de changements de séquence arbitraires ni de distorsion globale sur cette scène. En mode live, Frappe pilote les éventails, Explosion les nappes et Flash les aiguilles ; Boost augmente les trois groupes. **Singularité** sépare l'avant et l'arrière du disque d'accrétion et ajoute des jets polaires.
+Les touches 1 à 9 puis 0 sélectionnent les dix premières scènes du catalogue. La flèche droite et le mode automatique parcourent uniquement les scènes disponibles. Les transitions et les commandes live restent disponibles sur toutes les scènes.
 
-Les variantes sont séparées : **Plasma Cyclone** enroule la matière, **Plasma Fission** ouvre des fractures ; **Prisme Abyssal** superpose des plans de kaléidoscope dans un domaine borné pour garder les formes visibles ; **Prisme Fracture** ouvre puis referme des failles dans un motif unique. Gyroscope Chaos est supprimé ; ses presets rejoignent Gyroscope original.
+### Calibration en direct
 
-Cristal, Sonar et Métamorphe sont supprimés. Leurs anciens identifiants ne sont pas réutilisés : les presets correspondants sont redirigés respectivement vers Prisme, Onde de choc et Plasma Cyclone, en gardant tous les autres réglages. Les presets des scènes conservées gardent leur destination. Les changements de scènes conservent Cut direct ou fondu.
+Sous « Détails du signal audio », ouvrir **Calibrer le signal**. Chaque bande (basses, médiums, aigus) dispose de limites en Hz, d’un gain de 0 à 4× et d’un seuil de bruit. Les jauges affichent les niveaux après calibration. Les plages peuvent se chevaucher ; leurs limites sont ramenées aux fréquences analysables par la source. Les champs en Hz conservent la saisie pendant le rafraîchissement des jauges : toute valeur valide s’applique immédiatement. Une saisie incomplète reste éditable ; Entrée ou la sortie du champ valide les limites. Les curseurs s’appliquent immédiatement.
 
-### Six scènes supplémentaires
+**Activer la détection automatique** analyse six secondes de signal réel, puis ajuste les plages en Hz, les gains, les seuils de bruit et le niveau minimum des frappes. L’analyse continue par fenêtres de six secondes pour suivre la musique. Les bandes sans signal restent inchangées ; silence et pause ne produisent aucun réglage. Changer de source recommence l’analyse. Le bouton d’arrêt conserve les derniers réglages ; éditer un paramètre revient au mode manuel. Les valeurs restent sauvegardées, mais l’adaptation automatique doit être réactivée après rechargement.
 
-- **Faille dimensionnelle** : une déchirure s'ouvre sous la pression des basses et les coups de sub, révélant une matière turbulente ; des éclats quittent ses bords sur les frappes.
-- **Métal liquide** : une surface 3D comprimée par les basses, hérissée de pointes sur les impacts, avec des reflets procéduraux aux couleurs de la palette.
-- **Cathédrale fractale** : traversée d'arches pointues, colonnes et motifs imbriqués ; les basses resserrent l'architecture.
-- **Champ magnétique** : des filaments relient deux pôles mobiles ; les basses les écartent, les médiums animent les courbes et les aigus renforcent les étincelles. Le curseur Détail ajuste le nombre de filaments.
-- **Réacteur à fusion** : deux masses de plasma se rapprochent sur les impacts, fusionnent visuellement puis se séparent ; le bouton Frappe du mode live commande la collision, avec éjection de matière et onde de choc.
-- **Prisme vivant** : trois couches de plaques ouvrent une structure vers son cœur lumineux ; la musique ou les impulsions live commandent l'ouverture.
+Les trois boutons **Basses**, **Médiums** et **Aigus** activent les bandes indépendamment : toutes les combinaisons sont possibles. Couper une bande met immédiatement sa jauge à zéro et la retire du spectre utilisé par les visuels ; le niveau global du mix suit les bandes restantes. Le son écouté n’est pas modifié. Le gain et le seuil sont mémorisés ; réactiver une bande dont le gain était à zéro le remet à 1×. Si la bande servant aux frappes est coupée, la détection passe à une bande encore active. Tout couper suspend les réactions audio. L’auto-calibration respecte les bandes coupées ; le choix est sauvegardé dans les réglages et presets.
 
-Ces compositions réutilisent les palettes, les réglages de rendu, les transitions, les presets et le mode live. Les identifiants des scènes précédentes sont conservés. Les reflets du métal sont procéduraux, sans image d'environnement externe ; les filaments et l'architecture sont projetés depuis des coordonnées 3D. Leur performance et leur apparence n'ont pas été validées dans un navigateur pendant cette itération.
+L’attaque, le relâchement et le lissage règlent la réactivité. Pour les frappes, choisir la bande écoutée, la sensibilité, le niveau minimum en dB et l’espacement minimum. Cette détection utilise le signal avant les gains visuels et les seuils de bruit ; elle pilote les impacts et flashs automatiques ainsi que le BPM estimé. En mode live, les impacts et flashs restent manuels. Les affectations des mouvements aux bandes restent dans les réglages avancés des mouvements.
 
-### Univers numérique
+La calibration ne modifie pas le volume d’écoute. Elle est sauvegardée au prochain lancement, incluse dans les presets et conservée lors d’un changement de source. **Réinitialiser la calibration** restaure uniquement ces paramètres. Le spectre « Signal entrant » reste une vue d’ensemble du signal, tandis que les trois jauges montrent les bandes calibrées.
 
-**Matrix Rain** fait tomber un alphabet procédural en quatre couches ; **Data Tunnel** transporte les symboles sur les parois d'un tunnel ; **Circuit** fait circuler des impulsions dans des pistes coudées ; **Portails** traverse des cadres hexagonaux ; **Interférences** déforme des ondes avec des décalages de lignes ; **Cyber City** avance entre des blocs 3D avec des fenêtres lumineuses. Pour une ambiance Matrix verte, choisir la palette **Laser vert** ; les autres palettes restent disponibles.
+### Cinq nouveaux Prismes musicaux
 
-Ces six scènes sont incluses dans le préchargement complet et le mode live. Elles n'utilisent aucune police ni texture distante. Cyber City bénéficie du budget de résolution réduit des scènes à géométrie plus coûteuse. Aucun test, build ni aperçu n'a été lancé pour cet ajout.
+**Prisme Dentelle**, **Prisme Couronnes**, **Prisme Éclats**, **Prisme Spirale** et **Prisme Cristal** proposent cinq géométries distinctes. Le Prisme original, Abyssal et Fracture conservent leur rendu.
+
+Chaque nouveau Prisme possède cinq niveaux : **Éveil**, **Dentelle**, **Éclat**, **Expansion**, **Apogée**. Dans le panneau de mix, **Progression** permet de suivre automatiquement la musique ou de choisir un niveau. Les couches apparaissent progressivement : les médiums développent les facettes, les aigus ajoutent les ornements fins et les basses ouvrent les couches imposantes. Le dernier niveau demande une présence des basses ; un passage uniquement aigu ne suffit pas. Le retour au calme est lissé. Cette progression fonctionne indépendamment de Mix auto, respecte les bandes coupées et se transmet à la projection. Le choix du niveau est sauvegardé dans les presets.
 
 ### Niveaux et détection audio
 
 **Réponse des basses** ajuste le poids visuel des basses sans changer le volume d'écoute. Les niveaux utilisent une compression douce au lieu d'un écrêtage brutal, avec une retombée plus rapide. La détection des frappes travaille séparément, sur les variations du spectre flottant et l'enveloppe audio brute : les gains visuels ne peuvent plus supprimer les variations utilisées par le détecteur. Un compteur de frappes accompagne l'enveloppe pour transmettre les événements à la projection. Les BPM restent une estimation.
 
+## Mix visuel automatique
+
+Dans « Mix visuel », activer **MIX AUTO** pour suivre l’énergie de la musique. Les passages forts accentuent l’intensité, la vitesse du mouvement, le détail, le halo, le relief et le psychédélisme ; les passages légers les réduisent progressivement. L’enveloppe combine le niveau sonore, les trois bandes calibrées et les frappes. Une référence minimale empêche un passage silencieux de devenir artificiellement intense.
+
+**Amplitude** dose l’écart autour des curseurs de base ; **Retour au calme** règle la durée du relâchement. Les indications **En direct** affichent les valeurs réellement envoyées au rendu. Les curseurs restent éditables et conservent leurs valeurs ; désactiver l’auto les rétablit exactement. Le relief, le psychédélisme, le halo et l’intensité ont désormais des cibles fortes sur les passages intenses, même si leur base est faible. Une vitesse à zéro reste arrêtée. **Flashs auto** dose séparément les flashs ajoutés sur les frappes fortes ; à zéro, seuls les flashs réglés manuellement subsistent. Le mode live suspend cette modulation et le gel conserve l’enveloppe. La projection reçoit le même mix effectif que l’aperçu. Le choix du mode, son amplitude et son relâchement sont sauvegardés et inclus dans les presets.
+
+**Couleurs auto** fait évoluer le rendu entre deux couleurs personnalisables : **Calme** et **Ça tabasse**. Le passage suit l’énergie musicale, avec un mélange de teintes qui conserve leur saturation. Le niveau lumineux baisse sur les passages calmes. Désactiver cette option restaure la palette choisie. Les réglages de couleurs et de flashs sont inclus dans les presets.
+
+Les mouvements automatiques utilisent les frappes détectées, au lieu de relancer une impulsion à chaque variation des basses. Le détecteur exige aussi une hausse d’énergie : un simple transfert entre plusieurs notes graves de même niveau ne suffit plus. Pour **Vortex** et **Data Tunnel**, les impulsions de déplacement sont courtes, ne s’accumulent pas et l’avance est réduite. Le curseur **Avancée du tunnel** dans Mix auto permet de la doser, jusqu’à zéro ; les réglages avancés manuels de mouvement gardent la priorité lorsqu’ils sont activés.
+
 ## Pilotage live optionnel
 
-Le commutateur **MODE LIVE**, en haut du mix visuel, prend la main sur les déclenchements. Désactivé, les réactions automatiques et les réglages existants sont conservés. Activé, les scènes continuent d'évoluer et de réagir aux niveaux sonores, mais les frappes, flashs et explosions attendent les commandes du pupitre. Cela fonctionne sur les trente-trois scènes, y compris Orbital, même sans source audio.
+Le commutateur **MODE LIVE**, en haut du mix visuel, prend la main sur les déclenchements. Désactivé, les réactions automatiques et les réglages existants sont conservés. Activé, les scènes continuent d'évoluer et de réagir aux niveaux sonores, mais les frappes, flashs et explosions attendent les commandes du pupitre. Cela fonctionne sur les 33 scènes, y compris Orbital, même sans source audio.
 
 - **J / Frappe** : impulsion de profondeur et de mouvement, sans flash imposé.
 - **K / Flash** : éclair bref, dosé par le réglage Flashs du mode Rave.
@@ -105,7 +112,7 @@ Désactiver le mode live rend les déclenchements à l'audio sans changer les cu
 
 ## Chargement graphique
 
-Les 65 scènes sont préparées dès le démarrage, une par une, avec une progression réelle dans l'aperçu et la projection. La scène sélectionnée passe en priorité ; son rendu démarre dès qu'elle est prête pendant que le reste se prépare. Tous les programmes préparés sont conservés pour les changements suivants. Si une scène demandée n'est pas encore prête, l'ancienne reste affichée pendant l'attente.
+Les 33 scènes sont préparées dès le démarrage, une par une, avec une progression réelle dans l'aperçu et la projection. La scène sélectionnée passe en priorité ; son rendu démarre dès qu'elle est prête pendant que le reste se prépare. Tous les programmes préparés sont conservés pour les changements suivants. Si une scène demandée n'est pas encore prête, l'ancienne reste affichée pendant l'attente.
 
 Chaque programme ne contient que la scène concernée et ses fonctions nécessaires. `KHR_parallel_shader_compile`, lorsqu'il est disponible, permet de surveiller la compilation sans attendre de façon bloquante. Sans cette extension, le travail est fractionné mais un pilote peut encore bloquer brièvement sur une compilation individuelle. Les fondus composent deux programmes séparés ; ils ne recompilent pas toutes les scènes. Les scènes les plus lourdes ont un budget de pixels inférieur, y compris au premier rendu. La restauration du contexte relance le préchargement.
 

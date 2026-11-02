@@ -194,7 +194,10 @@ export class AudioEngine {
       await this.element.play()
     } else this.element.pause()
   }
-  update(dt, time, sensitivity, bassGain = 1) {
+  update(dt, time, sensitivity, bassGain = 1, calibration) {
+    if (calibration) this.features.configure(calibration)
+    if (this.analyser)
+      this.analyser.smoothingTimeConstant = this.features.calibration.audioSmoothing
     if (this.kind === 'idle' || !this.analyser) return this.features.values
     if (this.context.state === 'suspended') {
       this.frequency.fill(0)

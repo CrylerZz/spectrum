@@ -183,6 +183,8 @@ export class Renderer {
         'motion',
         'impact',
         'rave',
+        'dynamic',
+        'prism',
         'kick',
         'live',
         'audio',
@@ -225,13 +227,8 @@ export class Renderer {
           ? 520000
           : 1250000 * this.scale
     const expensive =
-      [
-        1, 9, 26, 27, 28, 30, 36, 39, 41, 42, 43, 44, 48, 55, 56, 59, 62, 63, 64, 65, 66, 67, 68,
-      ].includes(this.scene) ||
-      (this.mix < 1 &&
-        [
-          1, 9, 26, 27, 28, 30, 36, 39, 41, 42, 43, 44, 48, 55, 56, 59, 62, 63, 64, 65, 66, 67, 68,
-        ].includes(this.previous))
+      [1, 26, 56, 59].includes(this.scene) ||
+      (this.mix < 1 && [1, 26, 56, 59].includes(this.previous))
     const budget = Math.min(
       baseBudget,
       expensive
@@ -349,9 +346,19 @@ export class Renderer {
     gl.uniform1i(u.orbital, 1)
     gl.uniform1f(u.opacity, opacity)
     gl.uniform1f(u.orbitalImpact, orbitalImpact)
-    gl.uniform1f(u.orbitalTint, s.palette === 0 ? 0 : 1)
-    if (s.palette !== entry.palette) {
-      const colors = palettes[s.palette]?.colors || palettes[0].colors
+    gl.uniform1f(u.orbitalTint, s.dynamicColors || s.palette !== 0 ? 1 : 0)
+    const prism = s.prismSignal ?? [0, 0, 0, 0]
+    gl.uniform4f(
+      u.prism,
+      s.prismLevel > 0 ? (s.prismLevel - 1) / 4 : prism[0],
+      prism[1],
+      prism[2],
+      prism[3],
+    )
+    gl.uniform2f(u.dynamic, s.dynamicStrength ?? 0, s.dynamicColors ? 1 : 0)
+    const paletteKey = s.dynamicColors?.join(':') ?? s.palette
+    if (paletteKey !== entry.palette) {
+      const colors = s.dynamicColors || palettes[s.palette]?.colors || palettes[0].colors
       for (let i = 0; i < 3; i++) {
         const n = parseInt(colors[i].slice(1), 16)
         gl.uniform3f(
@@ -361,7 +368,7 @@ export class Renderer {
           (n & 255) / 255,
         )
       }
-      entry.palette = s.palette
+      entry.palette = paletteKey
     }
     gl.uniform2f(u.resolution, this.canvas.width, this.canvas.height)
     gl.uniform1f(u.time, this.time)

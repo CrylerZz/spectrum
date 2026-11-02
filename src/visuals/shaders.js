@@ -1,10 +1,10 @@
+import { prismScenes } from './prismScenes'
 import { extraScenes } from './extraScenes'
 import { spectacleScenes } from './spectacleScenes'
 import { digitalScenes } from './digitalScenes'
 import { festivalScenes } from './festivalScenes'
 import { retroScene } from './retroScene'
 import { referenceFlowScenes } from './referenceFlowScenes'
-import { referenceMachineScenes, referenceModelForScene } from './referenceMachineScenes'
 import { sceneAtmospheres, atmosphereForScene } from './sceneAtmospheres'
 
 export const vertex = `
@@ -17,6 +17,8 @@ uniform vec2 u_resolution;
 uniform float u_time;
 uniform vec3 u_motion; // accumulated rotation, deformation, travel
 uniform float u_impact;
+uniform vec4 u_prism; // progression, bass body, mid facets, treble detail
+uniform vec2 u_dynamic; // automatic movement strength, automatic colour grade
 uniform vec4 u_rave; // energy, depth, psychedelia, flashes
 uniform vec4 u_live; // manual mode, explosion envelope, held boost, impact
 uniform vec4 u_kick; // membrane displacement, flash, seconds since hit, velocity
@@ -36,17 +38,17 @@ uniform float u_orbitalImpact;
 uniform float u_orbitalTint;
 #define PI 3.14159265359
 #define TAU 6.28318530718
-float line(float d, float w) { return w / (abs(d) + w); }
+
 float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1,311.7))) * 43758.5453); }
 mat2 turn(float a) { return mat2(cos(a), -sin(a), sin(a), cos(a)); }
-float audio(float x) { return texture2D(u_spectrum, vec2(clamp(x,0.01,0.99),0.5)).r; }
+
 vec3 orbital(vec2 p) {
   vec2 uv = gl_FragCoord.xy / u_resolution;
-  if (u_live.x > .5) {
+  if (u_live.x > .5 || u_dynamic.x > .001) {
     vec2 q=uv-.5;
     float kick=u_kick.x*u_rave.y;
     q/=max(.35,1.0+kick*.4+u_live.y*.45);
-    q*=turn(u_live.y*.2*sin(length(q)*16.0));
+    q*=turn(u_live.y*.2*sin(length(q)*16.0)+u_dynamic.x*u_rave.z*.12*sin(length(q)*14.0-u_motion.y));
     uv=q+.5;
   }
   vec2 px = 1.0 / u_resolution;
@@ -91,33 +93,7 @@ float field(vec2 p) {
   }
   return v;
 }
-vec3 aurora(vec2 p) {
-  p *= turn(u_motion.x*.22);
-  float morph=u_motion.y, travel=u_motion.z;
-  vec3 col=vec3(0);
-  // Separate ribbon strands pass in front of and behind the central spine.
-  for(int i=0;i<12;i++) {
-    float f=float(i), lane=f/11.0;
-    float phase=p.x*(2.4+lane*.8)+morph*.6+f*.52;
-    float depth=sin(phase);
-    float perspective=1.0/max(.45,1.15-depth*.35-u_kick.x*u_rave.y*.15);
-    float envelope=exp(-p.x*p.x*.22);
-    float y=cos(phase)*(.28+lane*.45)*envelope;
-    y += sin(p.x*4.0-morph*.43+f*.8)*(.08+u_audio.y*.18);
-    y *= perspective;
-    float d=p.y-y;
-    float width=(.003+.005*(depth*.5+.5))*(.65+u_settings.y);
-    vec3 c=tint(f*.65+p.x*.5);
-    col += ink(d,width,c)*(.38+.45*(depth*.5+.5));
-    float bead=pow(max(0.0,cos(p.x*13.0-travel*3.5+f*1.7)),28.0);
-    col += ink(d,width*2.0,c)*bead*(.25+u_audio.z*1.1);
-    // Fine connecting threads give the braid a tangible volume.
-    float rung=abs(sin(p.x*18.0-travel*1.5+f*.2));
-    col += c*exp(-abs(d)*12.0)*exp(-rung*55.0)*.07*u_settings.y;
-  }
-  col += ink(length(p*vec2(.65,1.0))-(.3+fract(travel*.3)*1.5),.008,u_c3)*u_impact*.7;
-  return col;
-}
+
 vec3 liquid(vec2 p) {
   // Procedural turbulent plasma, with folded currents rather than a fluid solver.
   p *= turn(u_motion.x*.18);
@@ -145,29 +121,19 @@ vec3 liquid(vec2 p) {
   return col;
 }
 ${extraScenes}
+${prismScenes}
 ${spectacleScenes}
 ${digitalScenes}
 ${festivalScenes}
 ${retroScene}
 ${referenceFlowScenes}
-${referenceMachineScenes}
 ${sceneAtmospheres}
 vec3 scene(int id, vec2 p) {
   if(id==0) return orbital(p);
   if(id==1) return vortexDepth(p);
-  if(id==2) return aurora(p);
-  if(id==3) return mandalaDepth(p);
   if(id==4) return liquid(p);
-  if(id==5) return dustSwarm(p);
   if(id==6) return overdrive(p);
-  if(id==7) return reactor(p);
   if(id==8) return prism(p);
-  if(id==9) return shockwave(p);
-  if(id==10) return helix(p);
-  if(id==11) return laserShow(p);
-  if(id==12) return singularity(p);
-  if(id==15) return neuralDepth(p);
-  if(id==16) return inferno(p);
   if(id==17) return gyro(p);
   if(id==18) return latticeDepth(p);
   if(id==20) return plasmaCyclone(p);
@@ -176,48 +142,26 @@ vec3 scene(int id, vec2 p) {
   if(id==23) return prismFracture(p);
   if(id==25) return dimensionalRift(p);
   if(id==26) return liquidMetal(p);
-  if(id==27) return fractalCathedral(p);
-  if(id==28) return magneticField(p);
-  if(id==29) return fusionReactor(p);
-  if(id==30) return livingPrism(p);
   if(id==31) return matrixRain(p);
   if(id==32) return dataTunnel(p);
   if(id==33) return circuitBoard(p);
-  if(id==34) return cyberPortals(p);
   if(id==35) return digitalInterference(p);
-  if(id==36) return cyberCity(p);
-  if(id==37) return supernova(p);
   if(id==38) return thunderstorm(p);
-  if(id==39) return electricOcean(p);
   if(id==40) return neonDunes(p);
-  if(id==41) return kineticRibbons(p);
-  if(id==42) return jellyfish(p);
-  if(id==43) return mechanicalSwarm(p);
-  if(id==44) return mobiusStrip(p);
-  if(id==45) return speakerWall(p);
   if(id==46) return tectonicPlates(p);
   if(id==47) return borealis(p);
-  if(id==48) return spirograph3D(p);
-  if(id==49) return asteroidField(p);
-  if(id==50) return fireworks(p);
-  if(id==51) return lightfall(p);
   if(id==52) return lavaLamp(p);
-  if(id==53) return opticalVortex(p);
-  if(id==54) return luminousWeave(p);
-  if(id==55) return compressionChamber(p);
   if(id==56) return cosmicNebula(p);
   if(id==57) return retroResonance(p);
   if(id==59) return moireSilk(p);
   if(id==60) return contourCurrents(p);
   if(id==61) return acidDrapes(p);
-  if(id==62) return kaleidoMachinery(p);
-  if(id==63) return cyanCitadel(p);
-  if(id==64) return industrialRotor(p);
-  if(id==65) return neonEngines(p);
-  if(id==66) return neonGalaxies(p);
-  if(id==67) return spectralRosette(p);
-  if(id==68) return octagonMachinery(p);
   if(id==69) return liquidAbyss(p);
+  if(id==70) return prismLace(p);
+  if(id==71) return prismCrowns(p);
+  if(id==72) return prismShards(p);
+  if(id==73) return prismSpiral(p);
+  if(id==74) return prismCrystal(p);
   return gyro(p);
 }
 vec3 finishedScene(int id, vec2 p) {
@@ -226,21 +170,14 @@ vec3 finishedScene(int id, vec2 p) {
     vec3 original=orbital(p)*u_settings.x;
     if (u_live.x > .5) {
       original*=1.0+u_live.z*.8;
-      original=mix(original,vec3(1.0),u_kick.y*u_rave.w*.85);
     }
+    original=mix(original,vec3(1.0),u_kick.y*u_rave.w*.85);
     return clamp(original,0.0,1.0);
-  }
-  if(id==11) {
-    // Preserve a readable stage rig: no kaleidoscope, twist or random colour remap.
-    vec3 rig=laserShow(p);
-    vec3 venue=sceneAtmosphere(p)/(1.0+max(rig.r,max(rig.g,rig.b))*4.0);
-    vec3 beams=(rig+venue)*u_settings.x*(1.0+u_live.z);
-    beams=1.0-exp(-beams*1.65);
-    return mix(beams,vec3(1.0),u_live.x*u_kick.y*u_rave.w*.65);
   }
   if(id>=59) {
     // Reference compositions own their depth, deformation and full-frame material.
-    vec2 framed=p/max(.8,1.0+u_kick.x*u_rave.y*.06);
+    vec2 framed=p/max(.5,1.0+u_kick.x*u_rave.y*(.06+u_dynamic.x*.18));
+    framed*=turn(u_dynamic.x*u_rave.z*.13*sin(length(p)*6.0-u_motion.y));
     vec3 composed=scene(id,framed)*u_settings.x*(.85+u_rave.x*.25+u_live.z*.5);
     composed=mix(composed,composed.gbr,clamp(u_rave.z*.12,0.0,.3));
     composed=1.0-exp(-max(composed,vec3(0))*1.5);
@@ -249,14 +186,14 @@ vec3 finishedScene(int id, vec2 p) {
   }
   float energy=u_rave.x+u_live.z, psy=u_rave.z+u_live.y*.8;
   float r=length(p), a=atan(p.y,p.x);
-  float punch=u_kick.x*u_rave.y*(id==11 ? .18 : 1.0);
+  float punch=u_kick.x*u_rave.y*1.0;
   // Perspective displacement: centre thrusts forward, edges lag behind, then recoil.
   vec2 q=p/max(.35,1.0+punch*(.38+.3*exp(-r*r*2.0)));
   q += p*sin(r*8.0-u_kick.z*24.0)*exp(-u_kick.z*7.0)*.055*u_rave.y;
   // Radial folding and torsion breathe with the hit; accumulated rotation is separate.
-  float bend=(id==11 ? 0.0 : psy)*(.035*sin(r*9.0-u_motion.y)+u_impact*.07*sin(r*6.0));
+  float bend=psy*(.035*sin(r*9.0-u_motion.y)+u_impact*.07*sin(r*6.0));
   q *= turn(bend);
-  q += (id==11 ? 0.0 : psy)*.035*u_impact*vec2(sin(q.y*9.0+u_motion.y),cos(q.x*8.0-u_motion.y));
+  q += psy*.035*u_impact*vec2(sin(q.y*9.0+u_motion.y),cos(q.x*8.0-u_motion.y));
   // A separate live burst scatters the geometry and opens radial tears.
   q/=1.0+u_live.y*.7;
   q+=u_live.y*.12*vec2(sin(a*13.0+r*8.0),cos(a*11.0-r*9.0));
@@ -280,11 +217,17 @@ vec3 finishedScene(int id, vec2 p) {
   color=mix(color,vec3(1.0,.96,1.0),min(.88,flash*.85));
   return clamp(color,0.0,1.0);
 }
+vec3 dynamicGrade(vec3 color) {
+  float brightness=max(color.r,max(color.g,color.b));
+  vec3 mapped=mix(u_c1,u_c2,clamp(dot(color,vec3(.2126,.7152,.0722)),0.0,1.0))*brightness;
+  mapped+=vec3(pow(brightness,8.0))*.12;
+  return mix(color,mapped,u_dynamic.y*.85);
+}
 void main() {
   vec2 p = (gl_FragCoord.xy*2.0-u_resolution)/min(u_resolution.x,u_resolution.y);
   vec3 color = finishedScene(u_scene,p);
   if(u_mix<.999) color=mix(finishedScene(u_previous,p),color,smoothstep(0.0,1.0,u_mix));
-  gl_FragColor=vec4(color*(1.0-u_settings.w),1.0);
+  gl_FragColor=vec4(dynamicGrade(color)*(1.0-u_settings.w),1.0);
 }
 `
 
@@ -330,12 +273,9 @@ export function fragmentForScene(id) {
   const functions = new Map(shaderFunctions)
   functions.set('scene', `vec3 scene(int id, vec2 p) { return ${selected}(p); }`)
   functions.set('sceneAtmosphere', atmosphereForScene(id))
-  const model = referenceModelForScene(id)
-  if (model) functions.set('referenceMachineDistance', model)
   let finish = functions.get('finishedScene')
   for (const [sceneId, condition] of [
     [0, 'if (id == 0)'],
-    [11, 'if(id==11)'],
     [59, 'if(id>=59)'],
   ]) {
     const branch = takeBranch(finish, condition)
@@ -351,7 +291,7 @@ export function fragmentForScene(id) {
     `void main() {
     vec2 p = (gl_FragCoord.xy*2.0-u_resolution)/min(u_resolution.x,u_resolution.y);
     vec3 color = finishedScene(${id},p);
-    gl_FragColor=vec4(color*(1.0-u_settings.w),u_opacity);
+    gl_FragColor=vec4(dynamicGrade(color)*(1.0-u_settings.w),u_opacity);
   }`,
   )
   const used = new Set(),

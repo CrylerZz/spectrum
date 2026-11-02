@@ -1,17 +1,14 @@
 // Each scene selects a background family at compile time. No second scene render.
 const families = [
-  ['filamentSpace', [2, 6, 10, 15, 17, 28, 41, 44, 48, 54, 57]],
-  ['particleSpace', [5, 12, 37, 43, 49, 50, 51]],
-  ['facetSpace', [3, 8, 22, 23, 30, 34, 46, 53]],
-  ['structureSpace', [1, 7, 18, 27, 31, 32, 33, 36, 45, 55]],
-  ['flowSpace', [4, 16, 20, 21, 25, 26, 29, 52]],
-  ['waveSpace', [9, 35, 39, 40]],
-  ['mistSpace', [38, 42, 47, 56]],
-  ['stageSpace', [11]],
+  ['filamentSpace', [6, 17, 57]],
+
+  ['facetSpace', [8, 22, 23, 46]],
+  ['structureSpace', [1, 18, 31, 32, 33]],
+  ['flowSpace', [4, 20, 21, 25, 26, 52]],
+  ['waveSpace', [35, 40]],
+  ['mistSpace', [38, 47, 56]],
 ]
-const alreadyDense = new Set([
-  1, 4, 8, 16, 18, 20, 21, 22, 23, 26, 30, 31, 32, 33, 35, 36, 40, 45, 46, 53, 54, 56,
-])
+const alreadyDense = new Set([1, 4, 8, 18, 20, 21, 22, 23, 26, 31, 32, 33, 35, 40, 46, 56])
 export function atmosphereForScene(id) {
   if (id === 0) return 'vec3 sceneAtmosphere(vec2 p) { return vec3(0); }'
   const family = families.find(([, ids]) => ids.includes(id))?.[0] ?? 'mistSpace'
@@ -39,22 +36,7 @@ vec3 filamentSpace(vec2 p, float seed) {
   }
   return col;
 }
-vec3 particleSpace(vec2 p, float seed) {
-  vec3 col=vec3(0);
-  for(int i=0;i<3;i++) {
-    float layer=float(i), scale=5.0+layer*4.0;
-    vec2 q=turn(seed*.2+u_motion.x*.025)*p*scale;
-    q+=vec2(u_motion.z*.12/(layer+1.0),u_motion.y*.06)+seed;
-    vec2 cell=floor(q), local=fract(q)-.5;
-    vec2 offset=vec2(hash(cell+layer),hash(cell+seed+4.0))*.55-.275;
-    float d=length(local-offset);
-    float star=exp(-d*d*(650.0+layer*300.0));
-    float halo=exp(-d*16.0)*.08;
-    col+=tint(hash(cell)*6.0+layer)*(star*.65+halo)/(1.0+layer*.7);
-  }
-  float dust=field(p*2.0+vec2(seed,u_motion.z*.035));
-  return col+tint(seed)*pow(dust,3.0)*.2;
-}
+
 vec3 facetSpace(vec2 p, float seed) {
   vec2 q=turn(seed*.23+u_motion.x*.06)*p*(3.0+.3*sin(seed));
   q+=vec2(u_motion.y*.035,u_motion.z*.05);
@@ -106,11 +88,6 @@ vec3 mistSpace(vec2 p, float seed) {
   float wisps=pow(max(0.0,1.0-abs(n-.5)*2.0),6.0)*fine;
   return tint(seed+n*5.0)*(n*n*.17+wisps*.24);
 }
-vec3 stageSpace(vec2 p, float seed) {
-  // Low fog fills the venue without introducing unsynchronised laser beams.
-  float haze=field(p*2.0+vec2(seed,u_motion.z*.035));
-  float floorGlow=exp(-abs(p.y+.7)*1.4);
-  return mix(u_c1,u_c2,haze)*haze*(.04+floorGlow*.1);
-}
+
 vec3 sceneAtmosphere(vec2 p) { return vec3(0); }
 `

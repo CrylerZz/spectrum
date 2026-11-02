@@ -2403,3 +2403,140 @@ kbd {
       #070b22 21px 30px
     );
 }
+
+/* Keep calibration controls comfortably readable on narrow screens. */
+@media (max-width: 650px) {
+  .source-panel .signal-panel {
+    grid-column: 1 / -1;
+    grid-row: auto;
+    margin-top: 20px;
+  }
+  .source-panel .local-note {
+    grid-column: 1 / -1;
+    grid-row: auto;
+  }
+}
+
+.dynamic-mix .live-switch {
+  margin-bottom: 14px;
+}
+.dynamic-mix.dynamic-enabled .live-switch {
+  border-color: #85984f;
+}
+.dynamic-energy {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 16px 0;
+  font-size: 10px;
+  color: #bdcba2;
+}
+.dynamic-energy > div {
+  flex: 1;
+  height: 3px;
+  background: #30362a;
+}
+.dynamic-energy i {
+  display: block;
+  height: 100%;
+  background: #c4db72;
+}
+.dynamic-energy output {
+  min-width: 30px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.dynamic-effective {
+  display: block;
+  margin-top: 6px;
+  color: #b9ca9c;
+  font-size: 10px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.dynamic-colors {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin: 14px 0;
+}
+.dynamic-colors label {
+  display: grid;
+  gap: 8px;
+  color: #b8c3ab;
+  font-size: 11px;
+}
+.dynamic-colors input[type='color'] {
+  width: 100%;
+  height: 34px;
+  padding: 2px;
+  border: 1px solid #404735;
+  border-radius: 4px;
+  background: #14180f;
+  cursor: pointer;
+}
+.dynamic-color-preview {
+  grid-column: 1 / -1;
+  height: 5px;
+  border-radius: 3px;
+}
+
+.prism-mode {
+  display: grid;
+  gap: 10px;
+  margin-top: 16px;
+  color: #b9c3ad;
+  font-size: 11px;
+}
+.prism-mode select {
+  width: 100%;
+  min-width: 0;
+}
+.prism-steps {
+  display: flex;
+  gap: 5px;
+  margin-top: 16px;
+}
+.prism-steps i {
+  height: 4px;
+  flex: 1;
+  border-radius: 2px;
+  background: #30362a;
+}
+.prism-steps i.active {
+  background: #c5df7a;
+}
+.scene-art.prism-lace {
+  background: repeating-conic-gradient(
+    from 15deg,
+    #080e12 0 12deg,
+    #9d73ce 13deg,
+    #080e12 14deg 30deg
+  );
+}
+.scene-art.prism-crowns {
+  background: repeating-radial-gradient(ellipse, #080e12 0 10px, #7ae0d4 11px, #080e12 13px 22px);
+}
+.scene-art.prism-shards {
+  background: repeating-conic-gradient(
+    from 30deg,
+    #12101e 0 25deg,
+    #9463ce 26deg 35deg,
+    #172b36 36deg 60deg
+  );
+}
+.scene-art.prism-spiral {
+  background: repeating-conic-gradient(
+    from 0deg,
+    #102029 0 18deg,
+    #a65fc9 21deg,
+    #11131e 25deg 60deg
+  );
+  border-radius: 45% 45% 0 0;
+}
+.scene-art.prism-crystal {
+  background:
+    repeating-linear-gradient(60deg, transparent 0 18px, #748bb3 19px, transparent 21px 35px),
+    repeating-linear-gradient(-60deg, #0b1420 0 18px, #88b7b9 19px, #0b1420 21px 35px);
+}
