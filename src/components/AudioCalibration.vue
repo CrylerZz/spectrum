@@ -129,12 +129,8 @@ function display(key) {
 </script>
 
 <template>
-  <details class="audio-calibration">
+  <details class="audio-calibration" open>
     <summary>Calibrer le signal <span>Hz · gains · frappes</span></summary>
-    <p class="calibration-intro">
-      Ajuste pendant la lecture : les jauges et les scènes réagissent en direct. Le volume d’écoute
-      reste identique.
-    </p>
     <button
       type="button"
       class="calibration-auto"
@@ -153,10 +149,6 @@ function display(key) {
       max="1"
       aria-label="Analyse du signal"
     ></progress>
-    <p class="calibration-help">
-      L’auto ajuste les Hz, gains et seuils à partir de 6 secondes de musique, puis continue à
-      s’adapter. Modifier un réglage reprend la main. Les frappes restent détectées en mode manuel.
-    </p>
     <div class="band-toggles" role="group" aria-label="Bandes audio actives">
       <button
         v-for="band in audioBands"
@@ -169,91 +161,88 @@ function display(key) {
         {{ band.label }}<small>{{ settings[band.key + 'Enabled'] ? 'Actives' : 'Coupées' }}</small>
       </button>
     </div>
-    <p class="calibration-help">
-      Choisis une, deux ou trois bandes. Une bande coupée ne pilote plus les visuels ; son gain et
-      son seuil sont mémorisés pour la réactiver.
-    </p>
-    <fieldset
-      v-for="band in audioBands"
-      :key="band.key"
-      class="calibration-band"
-      :disabled="!settings[band.key + 'Enabled']"
-    >
-      <legend>{{ band.label }}</legend>
-      <div
-        class="calibration-level"
-        :aria-label="`${band.label} : ${Math.round(levels[band.key] * 100)} %`"
-        role="meter"
-        aria-valuemin="0"
-        aria-valuemax="100"
-        :aria-valuenow="Math.round(levels[band.key] * 100)"
+    <div class="calibration-bands">
+      <fieldset
+        v-for="band in audioBands"
+        :key="band.key"
+        class="calibration-band"
+        :disabled="!settings[band.key + 'Enabled']"
       >
-        <div><i :style="{ width: `${levels[band.key] * 100}%` }"></i></div>
-        <output>{{ Math.round(levels[band.key] * 100) }} %</output>
-      </div>
-      <div class="frequency-pair">
-        <label
-          v-for="edge in [
-            { key: 'LowHz', label: 'De' },
-            { key: 'HighHz', label: 'À' },
-          ]"
-          :key="edge.key"
+        <legend>{{ band.label }}</legend>
+        <div
+          class="calibration-level"
+          :aria-label="`${band.label} : ${Math.round(levels[band.key] * 100)} %`"
+          role="meter"
+          aria-valuemin="0"
+          aria-valuemax="100"
+          :aria-valuenow="Math.round(levels[band.key] * 100)"
         >
-          <span>{{ edge.label }} <small>Hz</small></span>
+          <div><i :style="{ width: `${levels[band.key] * 100}%` }"></i></div>
+          <output>{{ Math.round(levels[band.key] * 100) }} %</output>
+        </div>
+        <div class="frequency-pair">
+          <label
+            v-for="edge in [
+              { key: 'LowHz', label: 'De' },
+              { key: 'HighHz', label: 'À' },
+            ]"
+            :key="edge.key"
+          >
+            <span>{{ edge.label }} <small>Hz</small></span>
+            <input
+              type="number"
+              :aria-label="`${band.label} : fréquence ${edge.key === 'LowHz' ? 'minimum' : 'maximum'} en Hz`"
+              :value="drafts[band.key + edge.key]"
+              :min="calibrationLimits[band.key + edge.key][0]"
+              :max="calibrationLimits[band.key + edge.key][1]"
+              step="1"
+              @focus="beginFrequency(band.key + edge.key)"
+              @input="typeFrequency(band.key + edge.key, $event.target.value)"
+              @change="commitFrequency(band.key + edge.key, $event.target.value)"
+              @blur="commitFrequency(band.key + edge.key, $event.target.value)"
+              @keydown.enter.prevent="$event.target.blur()"
+            />
+          </label>
+        </div>
+        <label class="calibration-control">
+          <span
+            >Gain <output>{{ display(band.key + 'Trim') }}×</output></span
+          >
           <input
-            type="number"
-            :aria-label="`${band.label} : fréquence ${edge.key === 'LowHz' ? 'minimum' : 'maximum'} en Hz`"
-            :value="drafts[band.key + edge.key]"
-            :min="calibrationLimits[band.key + edge.key][0]"
-            :max="calibrationLimits[band.key + edge.key][1]"
-            step="1"
-            @focus="beginFrequency(band.key + edge.key)"
-            @input="typeFrequency(band.key + edge.key, $event.target.value)"
-            @change="commitFrequency(band.key + edge.key, $event.target.value)"
-            @blur="commitFrequency(band.key + edge.key, $event.target.value)"
-            @keydown.enter.prevent="$event.target.blur()"
+            type="range"
+            :aria-label="`${band.label} : gain`"
+            min="0"
+            max="4"
+            step="0.05"
+            :value="settings[band.key + 'Trim']"
+            @input="update(band.key + 'Trim', $event.target.value)"
           />
         </label>
-      </div>
-      <label class="calibration-control">
-        <span
-          >Gain <output>{{ display(band.key + 'Trim') }}×</output></span
-        >
-        <input
-          type="range"
-          :aria-label="`${band.label} : gain`"
-          min="0"
-          max="4"
-          step="0.05"
-          :value="settings[band.key + 'Trim']"
-          @input="update(band.key + 'Trim', $event.target.value)"
-        />
-      </label>
-      <label class="calibration-control">
-        <span
-          >Seuil de bruit
-          <output>{{ Math.round(settings[band.key + 'Gate'] * 100) }} %</output></span
-        >
-        <input
-          type="range"
-          :aria-label="`${band.label} : seuil de bruit`"
-          min="0"
-          max="0.5"
-          step="0.01"
-          :value="settings[band.key + 'Gate']"
-          @input="update(band.key + 'Gate', $event.target.value)"
-        />
-      </label>
-    </fieldset>
-    <p class="calibration-help">
-      Saisis les Hz directement : les valeurs valides s’appliquent sans attendre. La limite haute
-      doit dépasser la limite basse d’au moins 10 Hz. Les bandes peuvent se chevaucher. Le seuil de
-      bruit ignore les niveaux faibles avant d’appliquer le gain. La précision des fréquences dépend
-      de la source.
-    </p>
-    <fieldset class="calibration-band">
+        <label class="calibration-control">
+          <span
+            >Seuil de bruit
+            <output>{{ Math.round(settings[band.key + 'Gate'] * 100) }} %</output></span
+          >
+          <input
+            type="range"
+            :aria-label="`${band.label} : seuil de bruit`"
+            min="0"
+            max="0.5"
+            step="0.01"
+            :value="settings[band.key + 'Gate']"
+            @input="update(band.key + 'Gate', $event.target.value)"
+          />
+        </label>
+      </fieldset>
+    </div>
+    <fieldset class="calibration-band calibration-options">
       <legend>Réactivité</legend>
-      <label v-for="control in responseControls" :key="control.key" class="calibration-control">
+      <label
+        v-for="control in responseControls"
+        :key="control.key"
+        class="calibration-control"
+        :title="control.hint"
+      >
         <span
           >{{ control.label }} <output>{{ display(control.key) }} {{ control.unit }}</output></span
         >
@@ -266,10 +255,9 @@ function display(key) {
           :value="settings[control.key]"
           @input="update(control.key, $event.target.value)"
         />
-        <small>{{ control.hint }}</small>
       </label>
     </fieldset>
-    <fieldset class="calibration-band">
+    <fieldset class="calibration-band calibration-options">
       <legend>Détection des frappes</legend>
       <label class="calibration-control">
         <span
@@ -291,7 +279,12 @@ function display(key) {
           </option>
         </select>
       </label>
-      <label v-for="control in beatControls" :key="control.key" class="calibration-control">
+      <label
+        v-for="control in beatControls"
+        :key="control.key"
+        class="calibration-control"
+        :title="control.hint"
+      >
         <span
           >{{ control.label }} <output>{{ display(control.key) }} {{ control.unit }}</output></span
         >
@@ -304,18 +297,8 @@ function display(key) {
           :value="settings[control.key]"
           @input="update(control.key, $event.target.value)"
         />
-        <small>{{ control.hint }}</small>
       </label>
-      <p class="calibration-help">
-        Pilote les impacts, les flashs automatiques et l’estimation du BPM. Cette détection est
-        indépendante des gains et des seuils de bruit des jauges. En mode live, les impacts et les
-        flashs restent manuels.
-      </p>
     </fieldset>
-    <p class="calibration-help">
-      Pour faire suivre un mouvement aux médiums ou aux aigus, choisis sa source dans « Réglages
-      avancés des mouvements ».
-    </p>
     <button
       type="button"
       class="calibration-reset"
@@ -323,7 +306,6 @@ function display(key) {
     >
       Réinitialiser la calibration
     </button>
-    <p class="calibration-help">Sauvegardée automatiquement et incluse dans tes presets.</p>
   </details>
 </template>
 

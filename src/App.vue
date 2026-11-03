@@ -5,8 +5,8 @@ import AudioCalibration from './components/AudioCalibration.vue'
 import { AudioEngine, audioError } from './audio/AudioEngine'
 import { PrismDynamics, prismLevels } from './visuals/PrismDynamics.js'
 import { passageNames, shouldAdvanceScene } from './visuals/MusicalForm.js'
+import { fullAutoSettings } from './visuals/fullAuto.js'
 import { DynamicMix, dynamicControls } from './visuals/DynamicMix.js'
-import { sceneFamilies, filterScenes, cleanFavorites } from './visuals/library.js'
 import { directionForScene } from './visuals/sceneDirection.js'
 import { Renderer } from './visuals/Renderer'
 import { defaults, cleanSettings, scenes, palettes } from './visuals/scenes'
@@ -17,38 +17,21 @@ let restored = defaults
 try {
   restored = cleanSettings(JSON.parse(localStorage.getItem('spectrum.settings.v1')))
 } catch {}
-const settings = reactive({ ...restored })
-const sceneQuery = ref(''),
-  sceneFamily = ref('all'),
-  onlyFavorites = ref(false),
-  focusMode = ref(false)
-const favorites = ref([])
-try {
-  favorites.value = cleanFavorites(
-    JSON.parse(localStorage.getItem('spectrum.favorites.v1')),
-    scenes,
-  )
-} catch {}
-const visibleScenes = computed(() =>
-  filterScenes(scenes, {
-    query: sceneQuery.value,
-    family: sceneFamily.value,
-    favorites: favorites.value,
-    onlyFavorites: onlyFavorites.value,
-  }),
-)
-function toggleFavorite(id) {
-  favorites.value = favorites.value.includes(id)
-    ? favorites.value.filter((value) => value !== id)
-    : [...favorites.value, id]
-  try {
-    localStorage.setItem('spectrum.favorites.v1', JSON.stringify(favorites.value))
-  } catch {}
-}
-function resetSceneFilters() {
-  sceneQuery.value = ''
-  sceneFamily.value = 'all'
-  onlyFavorites.value = false
+const settings = reactive({ ...restored, auto: false })
+const focusMode = ref(false)
+const activeDeskTab = ref('audio')
+function navigateDeskTabs(event) {
+  if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return
+  event.preventDefault()
+  activeDeskTab.value =
+    event.key === 'Home'
+      ? 'audio'
+      : event.key === 'End'
+        ? 'mix'
+        : activeDeskTab.value === 'audio'
+          ? 'mix'
+          : 'audio'
+  nextTick(() => document.getElementById(`desk-tab-${activeDeskTab.value}`)?.focus())
 }
 const mixProfiles = [
   { name: 'Subtil', amount: 0.45, release: 2.4, flash: 0.1 },
@@ -207,6 +190,23 @@ function toggleAutoCalibration() {
   autoCalibration.enabled = true
   autoCalibration.progress = 0
   autoCalibration.message = 'En attente de musique…'
+}
+const fullAutoActive = computed(
+  () => autoCalibration.enabled && settings.dynamicMix && !settings.liveMode,
+)
+function toggleFullAuto() {
+  if (fullAutoActive.value) {
+    stopAutoCalibration()
+    settings.dynamicMix = false
+    settings.auto = false
+    return
+  }
+  Object.assign(settings, fullAutoSettings)
+  autoTime = 0
+  dynamicMix.reset()
+  prismDynamics.reset()
+  if (autoCalibration.enabled) stopAutoCalibration()
+  toggleAutoCalibration()
 }
 function calibrateAudio(dt) {
   if (!autoCalibration.enabled) return
@@ -923,12 +923,65 @@ onBeforeUnmount(() => {
         ><span class="brand-mark"><i></i><i></i><i></i><i></i><i></i></span
         ><strong>SPECTRUM<span>LIVE VISUAL STUDIO</span></strong></a
       >
+      <div class="header-signal" aria-label="Signal audio entrant">
+        <div class="spectrum-bars" aria-hidden="true">
+          <i
+            v-for="(bar, i) in bars"
+            :key="i"
+            :style="{ height: `${Math.max(4, bar * 100)}%`, opacity: 0.2 + bar * 0.8 }"
+          ></i>
+        </div>
+      </div>
       <div class="session-name">
         <span class="status-dot" :class="{ active: source !== 'idle' }"></span
         >{{ source === 'idle' ? 'Prêt à jouer' : 'Session en direct'
         }}<span class="session-divider">/</span><span>Session locale</span>
       </div>
+      <div
+        class="desk-tabs"
+        role="tablist"
+        aria-label="Réglages du studio"
+        @keydown="navigateDeskTabs"
+      >
+        <button
+          v-for="tab in [
+            { id: 'audio', label: '01 / Audio' },
+            { id: 'mix', label: '02 / Mix visuel' },
+          ]"
+          :key="tab.id"
+          :id="`desk-tab-${tab.id}`"
+          role="tab"
+          :aria-selected="activeDeskTab === tab.id"
+          :aria-controls="`desk-panel-${tab.id}`"
+          :tabindex="activeDeskTab === tab.id ? 0 : -1"
+          @click="activeDeskTab = tab.id"
+        >
+          {{ tab.label }}
+        </button>
+      </div>
       <div class="top-actions">
+        <button
+          class="full-auto-button"
+          :aria-pressed="fullAutoActive"
+          @click="toggleFullAuto"
+          title="Calibration des 3 bandes, couleurs et effets automatiques"
+        >
+          {{ fullAutoActive ? 'Tout auto · actif' : 'Tout auto' }}
+        </button>
+        <label
+          class="header-live"
+          :class="{ active: settings.liveMode }"
+          title="Déclencher les impacts à la main"
+        >
+          <span>Mode live</span>
+          <input
+            v-model="settings.liveMode"
+            type="checkbox"
+            role="switch"
+            aria-label="Activer le pilotage live"
+          />
+          <span class="header-live-track" aria-hidden="true"></span>
+        </label>
         <button class="quiet help-button" @click="help = true" aria-label="Ouvrir l’aide">?</button
         ><button class="button output-button" @click="openProjection">
           <span>▣</span> {{ outputOpen ? 'Voir la projection' : 'Ouvrir la projection' }}
@@ -938,174 +991,10 @@ onBeforeUnmount(() => {
     </header>
 
     <main class="workspace">
-      <aside class="source-panel panel">
-        <div class="panel-heading">
-          <span class="eyebrow">01 / AUDIO</span
-          ><span class="tiny-dot" :class="{ on: source !== 'idle' }"></span>
-        </div>
-        <h2>Le son donne le rythme.</h2>
-        <p class="muted intro">Choisis ta source. Les visuels suivent.</p>
-        <button class="demo-button" :disabled="busy" @click="demo">
-          <span class="play-symbol">▶</span
-          ><span
-            ><strong>Lancer la démo</strong><small>Un premier voyage, sans branchement</small></span
-          ><span>↗</span>
-        </button>
-        <div class="section-label">SOURCE AUDIO</div>
-        <div class="source-tabs" role="tablist" aria-label="Source audio">
-          <button
-            v-for="tab in [
-              { id: 'file', label: 'Fichier' },
-              { id: 'tab', label: 'Onglet' },
-              { id: 'mic', label: 'Entrée' },
-            ]"
-            :key="tab.id"
-            role="tab"
-            :aria-selected="sourceTab === tab.id"
-            :class="{ selected: sourceTab === tab.id }"
-            @click="sourceTab = tab.id"
-          >
-            {{ tab.label }}
-          </button>
-        </div>
-        <div class="source-content">
-          <button
-            v-if="sourceTab === 'file'"
-            class="dropzone"
-            :class="{ dragging }"
-            :disabled="busy"
-            @click="audioInput.click()"
-            @dragover.prevent="dragging = true"
-            @dragleave.prevent="dragging = false"
-            @drop.prevent="drop"
-          >
-            <span class="upload-symbol">↥</span><strong>Dépose ton morceau ici</strong
-            ><span>ou clique pour parcourir</span><small>MP3, WAV, FLAC, OGG, M4A</small>
-          </button>
-          <div v-else-if="sourceTab === 'tab'" class="source-instructions">
-            <span class="source-icon">▤</span><strong>La musique de ton navigateur</strong>
-            <p>
-              Ouvre YouTube, une radio ou ton lecteur web. Sélectionne son onglet et coche
-              <b>Partager le son</b>.
-            </p>
-            <button class="button wide" :disabled="busy" @click="capture('tab')">
-              Capturer un onglet ↗</button
-            ><small
-              >Chrome / Edge conseillés. La capture du son système dépend du navigateur et de
-              l’OS.</small
-            >
-          </div>
-          <div v-else class="source-instructions">
-            <span class="source-icon">◉</span><strong>Micro ou interface audio</strong>
-            <p>Écoute autour de toi, ou choisis une entrée reliée à une table de mixage.</p>
-            <label class="sr-only" for="device">Entrée audio</label
-            ><select id="device" v-model="deviceId">
-              <option value="">Entrée par défaut</option>
-              <option
-                v-for="(device, i) in devices"
-                :key="device.deviceId || i"
-                :value="device.deviceId"
-              >
-                {{ device.label || `Entrée audio ${i + 1}` }}
-              </option></select
-            ><button class="button wide" :disabled="busy" @click="capture('mic')">
-              {{ source === 'mic' ? 'Reconnecter cette entrée' : 'Activer l’entrée' }}</button
-            ><button class="text-button" @click="refreshDevices">↻ Actualiser les entrées</button
-            ><small
-              >Les noms apparaissent après autorisation du micro. Le son capturé n’est pas renvoyé
-              aux enceintes.</small
-            >
-          </div>
-        </div>
-        <input
-          ref="audioInput"
-          class="sr-only"
-          tabindex="-1"
-          type="file"
-          accept="audio/*,.flac,.m4a"
-          @change="fileChange"
-        />
-        <div v-if="error" class="error-box" role="alert">
-          {{ error }}<button @click="error = ''" aria-label="Fermer l’erreur">×</button>
-        </div>
-        <div class="signal-panel">
-          <div class="section-label signal-title">
-            <span>SIGNAL ENTRANT</span
-            ><span class="signal-state">{{ stats.level > 0.01 ? 'ACTIF' : 'SILENCE' }}</span>
-          </div>
-          <div class="spectrum-bars" aria-hidden="true">
-            <i
-              v-for="(bar, i) in bars"
-              :key="i"
-              :style="{ height: `${Math.max(4, bar * 100)}%`, opacity: 0.2 + bar * 0.8 }"
-            ></i>
-          </div>
-          <details class="audio-details">
-            <summary>Détails du signal audio</summary>
-            <div
-              class="band-meter"
-              v-for="band in [
-                { key: 'bass', label: 'Basses' },
-                { key: 'mid', label: 'Médiums' },
-                { key: 'high', label: 'Aigus' },
-              ]"
-              :key="band.key"
-            >
-              <span>{{ band.label }}</span>
-              <div><i :style="{ width: `${stats[band.key] * 100}%` }"></i></div>
-              <small>{{ Math.round(stats[band.key] * 100) }}</small>
-            </div>
-            <div class="bpm-row">
-              <span class="beat-dot" :style="{ opacity: 0.2 + stats.beat * 0.8 }"></span
-              ><strong>{{ stats.bpm || '—' }}</strong
-              ><span>{{ stats.bpmConfidence >= 0.8 ? 'BPM · STABLE' : 'BPM · ESTIMATION' }}</span>
-            </div>
-          </details>
-          <details class="studio-drawer audio-tuning">
-            <summary>Sensibilité du signal</summary>
-            <div class="sliders">
-              <label
-                v-for="control in controls.filter((c) =>
-                  ['sensitivity', 'bassGain'].includes(c.key),
-                )"
-                :key="control.key"
-              >
-                <span
-                  >{{ control.name }}<output>{{ settings[control.key].toFixed(2) }}×</output></span
-                >
-                <input
-                  v-model.number="settings[control.key]"
-                  type="range"
-                  :min="control.min"
-                  :max="control.max"
-                  step=".01"
-                  :aria-label="control.name"
-                />
-              </label>
-            </div>
-          </details>
-          <AudioCalibration
-            :settings="settings"
-            :levels="stats"
-            :automatic="autoCalibration"
-            @toggle-auto="toggleAutoCalibration"
-            @manual="stopAutoCalibration"
-            @change="Object.assign(settings, $event)"
-          />
-          <p class="motion-hint">
-            Branche ta musique : les frappes déclenchent les impacts et les flashs automatiquement.
-          </p>
-        </div>
-        <div class="local-note">
-          <span>⌁</span>
-          <p>Le son reste sur ton ordinateur.<br />Aucun fichier envoyé en ligne.</p>
-        </div>
-      </aside>
-
       <section class="center-column">
         <div class="preview-toolbar">
           <div>
-            <span class="eyebrow">02 / LIVE CANVAS</span
+            <span class="eyebrow">APERÇU LIVE</span
             ><span class="live-pill"
               ><i></i> {{ settings.blackout ? 'NOIR' : settings.frozen ? 'FIGÉ' : 'LIVE' }}</span
             >
@@ -1237,51 +1126,12 @@ onBeforeUnmount(() => {
         <section class="scenes-panel">
           <div class="scenes-heading">
             <div>
-              <span class="eyebrow">03 / SCÈNES</span
+              <span class="eyebrow">SCÈNES</span
               ><span class="scene-count">{{ scenes.length }} univers à explorer</span>
             </div>
-            <label class="auto-control"
-              ><span>Auto-pilote</span
-              ><input v-model="settings.auto" type="checkbox" role="switch" /><span
-                class="switch"
-              ></span
-            ></label>
           </div>
-          <div class="library-tools">
-            <label class="scene-search"
-              ><span class="sr-only">Rechercher une scène</span
-              ><input
-                v-model="sceneQuery"
-                type="search"
-                placeholder="Rechercher une scène…"
-                aria-label="Rechercher une scène"
-            /></label>
-            <button
-              class="favorites-filter"
-              :aria-pressed="onlyFavorites"
-              @click="onlyFavorites = !onlyFavorites"
-            >
-              ★ Favoris <span>{{ favorites.length }}</span>
-            </button>
-          </div>
-          <div class="scene-families" role="group" aria-label="Familles de scènes">
-            <button
-              v-for="family in sceneFamilies"
-              :key="family.key"
-              :aria-pressed="sceneFamily === family.key"
-              @click="sceneFamily = family.key"
-            >
-              {{ family.name }}
-            </button>
-          </div>
-          <p class="library-result" role="status">
-            {{ visibleScenes.length }} scène{{ visibleScenes.length > 1 ? 's' : ''
-            }}<template v-if="sceneQuery || onlyFavorites || sceneFamily !== 'all'">
-              · <button @click="resetSceneFilters">Tout afficher</button></template
-            >
-          </p>
           <div class="scene-grid">
-            <div v-for="scene in visibleScenes" :key="scene.id" class="scene-tile">
+            <div v-for="scene in scenes" :key="scene.id" class="scene-tile">
               <button
                 class="scene-card"
                 :class="{ selected: settings.scene === scene.id }"
@@ -1310,23 +1160,10 @@ onBeforeUnmount(() => {
                   }}</kbd>
                 </div>
               </button>
-              <button
-                class="scene-favorite"
-                :aria-label="`${favorites.includes(scene.id) ? 'Retirer' : 'Ajouter'} ${scene.name} ${favorites.includes(scene.id) ? 'des' : 'aux'} favoris`"
-                :aria-pressed="favorites.includes(scene.id)"
-                @click="toggleFavorite(scene.id)"
-              >
-                {{ favorites.includes(scene.id) ? '★' : '☆' }}
-              </button>
             </div>
           </div>
-          <p v-if="!visibleScenes.length" class="library-empty">
-            Aucune scène ne correspond.
-            <button @click="resetSceneFilters">Revenir à la bibliothèque</button>
-          </p>
-          <div class="scene-footer">
-            <span>Auto-pilote : changement sur une phrase, un drop ou un break.</span
-            ><label v-if="settings.auto"
+          <div v-if="settings.auto" class="scene-footer">
+            <label
               >Attendre au moins
               <select
                 v-model.number="settings.autoInterval"
@@ -1336,412 +1173,150 @@ onBeforeUnmount(() => {
                 <option :value="24">24 s</option>
                 <option :value="48">48 s</option>
               </select></label
-            ><span v-else><kbd>→</kbd> pour parcourir les {{ scenes.length }} scènes</span>
+            >
           </div>
         </section>
       </section>
 
-      <aside class="controls-panel panel">
-        <div class="panel-heading">
-          <span class="eyebrow">04 / MIX VISUEL</span
-          ><button
-            class="text-button"
-            @click="resetVisualMix"
-            title="Réinitialiser le mix visuel en conservant la scène et la calibration audio"
-          >
-            ↺ Réinitialiser
-          </button>
-        </div>
-        <section class="live-console control-group" :class="{ 'live-enabled': settings.liveMode }">
-          <label class="live-switch">
-            <span
-              >MODE LIVE
-              <small>{{
-                settings.liveMode ? 'Tu commandes les impacts' : 'Réactions automatiques'
-              }}</small></span
-            >
-            <input
-              v-model="settings.liveMode"
-              type="checkbox"
-              role="switch"
-              aria-label="Activer le pilotage live"
-            />
-          </label>
-          <template v-if="settings.liveMode">
-            <p class="motion-hint">
-              La scène continue de vivre. Déclenche les impacts toi-même, même sans musique.
-            </p>
-            <div class="live-pads">
+      <section class="settings-desk">
+        <aside
+          v-show="activeDeskTab === 'audio'"
+          id="desk-panel-audio"
+          role="tabpanel"
+          aria-labelledby="desk-tab-audio"
+          tabindex="0"
+          class="source-panel panel"
+        >
+          <div class="panel-heading">
+            <span class="eyebrow">01 / AUDIO</span
+            ><span class="tiny-dot" :class="{ on: source !== 'idle' }"></span>
+          </div>
+          <details class="source-setup" :open="source === 'idle'">
+            <summary>
+              {{ source === 'idle' ? 'Connecter la musique' : 'Source connectée · changer' }}
+            </summary>
+            <h2>Le son donne le rythme.</h2>
+            <p class="muted intro">Choisis ta source. Les visuels suivent.</p>
+            <button class="demo-button" :disabled="busy" @click="demo">
+              <span class="play-symbol">▶</span
+              ><span
+                ><strong>Lancer la démo</strong
+                ><small>Un premier voyage, sans branchement</small></span
+              ><span>↗</span>
+            </button>
+            <div class="section-label">SOURCE AUDIO</div>
+            <div class="source-tabs" role="tablist" aria-label="Source audio">
               <button
-                v-for="pad in livePads"
-                :key="pad.action"
-                type="button"
-                :class="{ 'pad-active': liveActive === pad.action }"
-                :disabled="settings.frozen || settings.blackout"
-                :aria-keyshortcuts="pad.key.toLowerCase()"
-                @pointerdown="
-                  (event) => {
-                    if (event.button === 0) {
-                      event.preventDefault()
-                      triggerLive(pad.action)
-                    }
-                  }
-                "
-                @click="
-                  (event) => {
-                    if (event.detail === 0) triggerLive(pad.action)
-                  }
-                "
+                v-for="tab in [
+                  { id: 'file', label: 'Fichier' },
+                  { id: 'tab', label: 'Onglet' },
+                  { id: 'mic', label: 'Entrée' },
+                ]"
+                :key="tab.id"
+                role="tab"
+                :aria-selected="sourceTab === tab.id"
+                :class="{ selected: sourceTab === tab.id }"
+                @click="sourceTab = tab.id"
               >
-                <kbd>{{ pad.key }}</kbd
-                ><strong>{{ pad.name }}</strong
-                ><small>{{ pad.hint }}</small>
-              </button>
-              <button
-                type="button"
-                class="boost-pad"
-                :class="{ 'pad-active': boostHeld }"
-                :disabled="settings.frozen || settings.blackout"
-                aria-keyshortcuts="u"
-                @pointerdown="boostPointer"
-                @pointerup="releaseBoostPointer"
-                @pointercancel="releaseBoostPointer"
-                @lostpointercapture="releaseBoostPointer"
-                @keydown.space.prevent.stop="setBoostInput('button-space', true)"
-                @keyup.space.prevent.stop="setBoostInput('button-space', false)"
-                @keydown.enter.prevent.stop="setBoostInput('button-enter', true)"
-                @keyup.enter.prevent.stop="setBoostInput('button-enter', false)"
-                @blur="releaseBoostKeyboard"
-              >
-                <kbd>U</kbd><strong>Boost</strong><small>Maintenir pour accélérer</small>
+                {{ tab.label }}
               </button>
             </div>
-            <p class="motion-hint" v-if="settings.frozen || settings.blackout">
-              Réactive l’image pour utiliser les pads.
-            </p>
-            <p class="motion-hint" v-else>
-              J · frappe / K · flash / L · explosion / U maintenu · boost. Désactive le mode pour
-              retrouver l’automatique.
-            </p>
-          </template>
-        </section>
-        <section v-if="isAdaptivePrism" class="control-group prism-controls">
-          <div class="section-label">PRISME · 5 NIVEAUX</div>
-          <label class="prism-mode"
-            >Progression
-            <select v-model.number="settings.prismLevel" aria-label="Niveau du Prisme">
-              <option :value="0">Automatique · suit la musique</option>
-              <option v-for="(name, index) in prismLevels" :key="name" :value="index + 1">
-                {{ index + 1 }} · {{ name }}
-              </option>
-            </select>
-          </label>
-          <div
-            class="prism-steps"
-            role="meter"
-            aria-label="Densité du Prisme"
-            aria-valuemin="1"
-            aria-valuemax="5"
-            :aria-valuenow="1 + Math.round(prismState.level * 4)"
-          >
-            <i
-              v-for="n in 5"
-              :key="n"
-              :class="{ active: n <= 1 + Math.round(prismState.level * 4) }"
-            ></i>
-          </div>
-          <p class="motion-hint">
-            {{ prismLevels[Math.round(prismState.level * 4)] }} · Les médiums dessinent les
-            facettes, les aigus la dentelle ; les basses ouvrent les grandes couches. La densité
-            évolue en fondu, même sans Mix auto.
-          </p>
-        </section>
-        <section class="control-group dynamic-mix" :class="{ 'dynamic-enabled': dynamicActive }">
-          <label class="live-switch">
-            <span>MIX AUTO <small>Suit l’énergie de la musique</small></span>
+            <div class="source-content">
+              <button
+                v-if="sourceTab === 'file'"
+                class="dropzone"
+                :class="{ dragging }"
+                :disabled="busy"
+                @click="audioInput.click()"
+                @dragover.prevent="dragging = true"
+                @dragleave.prevent="dragging = false"
+                @drop.prevent="drop"
+              >
+                <span class="upload-symbol">↥</span><strong>Dépose ton morceau ici</strong
+                ><span>ou clique pour parcourir</span><small>MP3, WAV, FLAC, OGG, M4A</small>
+              </button>
+              <div v-else-if="sourceTab === 'tab'" class="source-instructions">
+                <span class="source-icon">▤</span><strong>La musique de ton navigateur</strong>
+                <p>
+                  Ouvre YouTube, une radio ou ton lecteur web. Sélectionne son onglet et coche
+                  <b>Partager le son</b>.
+                </p>
+                <button class="button wide" :disabled="busy" @click="capture('tab')">
+                  Capturer un onglet ↗</button
+                ><small
+                  >Chrome / Edge conseillés. La capture du son système dépend du navigateur et de
+                  l’OS.</small
+                >
+              </div>
+              <div v-else class="source-instructions">
+                <span class="source-icon">◉</span><strong>Micro ou interface audio</strong>
+                <p>Écoute autour de toi, ou choisis une entrée reliée à une table de mixage.</p>
+                <label class="sr-only" for="device">Entrée audio</label
+                ><select id="device" v-model="deviceId">
+                  <option value="">Entrée par défaut</option>
+                  <option
+                    v-for="(device, i) in devices"
+                    :key="device.deviceId || i"
+                    :value="device.deviceId"
+                  >
+                    {{ device.label || `Entrée audio ${i + 1}` }}
+                  </option></select
+                ><button class="button wide" :disabled="busy" @click="capture('mic')">
+                  {{ source === 'mic' ? 'Reconnecter cette entrée' : 'Activer l’entrée' }}</button
+                ><button class="text-button" @click="refreshDevices">
+                  ↻ Actualiser les entrées</button
+                ><small
+                  >Les noms apparaissent après autorisation du micro. Le son capturé n’est pas
+                  renvoyé aux enceintes.</small
+                >
+              </div>
+            </div>
             <input
-              v-model="settings.dynamicMix"
-              type="checkbox"
-              role="switch"
-              aria-label="Activer le mix visuel automatique"
+              ref="audioInput"
+              class="sr-only"
+              tabindex="-1"
+              type="file"
+              accept="audio/*,.flac,.m4a"
+              @change="fileChange"
             />
-          </label>
-          <div class="mix-profiles" role="group" aria-label="Caractère du mix automatique">
-            <button
-              v-for="profile in mixProfiles"
-              :key="profile.name"
-              :aria-pressed="
-                settings.dynamicMix &&
-                settings.dynamicAmount === profile.amount &&
-                settings.dynamicRelease === profile.release &&
-                settings.dynamicFlash === profile.flash
-              "
-              @click="applyMixProfile(profile)"
-            >
-              {{ profile.name }}
-            </button>
+          </details>
+          <div v-if="error" class="error-box" role="alert">
+            {{ error }}<button @click="error = ''" aria-label="Fermer l’erreur">×</button>
           </div>
-          <template v-if="settings.dynamicMix">
-            <p class="motion-hint" v-if="settings.liveMode">
-              En pause pendant le mode live : tes commandes gardent la main.
-            </p>
-            <template v-else>
+          <div class="signal-panel">
+            <details class="audio-details" open>
+              <summary>Détails du signal audio</summary>
               <div
-                class="dynamic-energy"
-                role="meter"
-                aria-label="Énergie du mix automatique"
-                aria-valuemin="0"
-                aria-valuemax="100"
-                :aria-valuenow="Math.round(visualMixState.energy * 100)"
+                class="band-meter"
+                v-for="band in [
+                  { key: 'bass', label: 'Basses' },
+                  { key: 'mid', label: 'Médiums' },
+                  { key: 'high', label: 'Aigus' },
+                ]"
+                :key="band.key"
               >
-                <span>{{ settings.frozen ? 'Figé' : passageNames[passage] }}</span>
-                <div><i :style="{ width: `${visualMixState.energy * 100}%` }"></i></div>
-                <output>{{ Math.round(visualMixState.energy * 100) }}%</output>
+                <span>{{ band.label }}</span>
+                <div><i :style="{ width: `${stats[band.key] * 100}%` }"></i></div>
+                <small>{{ Math.round(stats[band.key] * 100) }}</small>
               </div>
-              <details class="studio-drawer mix-settings">
-                <summary>Réglages du mix auto</summary>
-                <div class="sliders">
-                  <label
-                    ><span
-                      >Amplitude
-                      <output>{{ Math.round(settings.dynamicAmount * 100) }}%</output></span
-                    >
-                    <input
-                      v-model.number="settings.dynamicAmount"
-                      type="range"
-                      min="0"
-                      max="1"
-                      step="0.01"
-                      aria-label="Amplitude du mix automatique"
-                    />
-                  </label>
-                  <label
-                    ><span
-                      >Retour au calme
-                      <output>{{ settings.dynamicRelease.toFixed(1) }} s</output></span
-                    >
-                    <input
-                      v-model.number="settings.dynamicRelease"
-                      type="range"
-                      min="0.3"
-                      max="4"
-                      step="0.1"
-                      aria-label="Retour au calme du mix automatique"
-                    />
-                  </label>
-                </div>
-                <div class="sliders">
-                  <label
-                    ><span
-                      >Flashs auto
-                      <output>{{ Math.round(settings.dynamicFlash * 100) }}%</output></span
-                    >
-                    <input
-                      v-model.number="settings.dynamicFlash"
-                      type="range"
-                      min="0"
-                      max="1"
-                      step="0.01"
-                      aria-label="Dosage des flashs automatiques"
-                    />
-                  </label>
-                  <label v-if="[1, 32].includes(settings.scene)"
-                    ><span
-                      >Avancée du tunnel
-                      <output>{{ Math.round(settings.tunnelTravel * 100) }}%</output></span
-                    >
-                    <input
-                      v-model.number="settings.tunnelTravel"
-                      type="range"
-                      min="0"
-                      max="1"
-                      step="0.01"
-                      aria-label="Avancée du tunnel"
-                      :disabled="settings.advancedMotion"
-                    />
-                    <small class="motion-hint">{{
-                      settings.advancedMotion
-                        ? 'Pilotée par tes réglages manuels de déplacement.'
-                        : 'Dérive lente et poussées brèves sur les frappes.'
-                    }}</small>
-                  </label>
-                </div>
-              </details>
-              <label class="rave-toggle"
-                ><input v-model="settings.dynamicColorEnabled" type="checkbox" /> Couleurs
-                auto</label
-              >
-              <div v-if="settings.dynamicColorEnabled" class="dynamic-colors">
+              <div class="bpm-row">
+                <span class="beat-dot" :style="{ opacity: 0.2 + stats.beat * 0.8 }"></span
+                ><strong>{{ stats.bpm || '—' }}</strong
+                ><span>{{ stats.bpmConfidence >= 0.8 ? 'BPM · STABLE' : 'BPM · ESTIMATION' }}</span>
+              </div>
+            </details>
+            <details class="studio-drawer audio-tuning" open>
+              <summary>Sensibilité du signal</summary>
+              <div class="sliders">
                 <label
-                  >Calme<input
-                    v-model="settings.dynamicCalmColor"
-                    type="color"
-                    aria-label="Couleur des passages calmes"
-                /></label>
-                <label
-                  >Ça tabasse<input
-                    v-model="settings.dynamicHotColor"
-                    type="color"
-                    aria-label="Couleur des passages intenses"
-                /></label>
-                <div
-                  class="dynamic-color-preview"
-                  :style="{
-                    background:
-                      visualMixState.values.dynamicColors?.[0] || settings.dynamicCalmColor,
-                  }"
-                  aria-label="Couleur actuelle du mix"
-                ></div>
-              </div>
-              <p class="motion-hint">
-                Les passages calmes sont plus sombres. Sur les frappes fortes, l’auto pousse le
-                relief, le psychédélisme et les couleurs. Flashs auto à zéro désactive les flashs
-                ajoutés ; tes flashs manuels restent réglables dans « Sculpter la scène ».
-              </p>
-            </template>
-          </template>
-        </section>
-        <div class="control-group palette-group">
-          <div class="section-label">
-            PALETTE
-            <span>{{
-              dynamicActive && settings.dynamicColorEnabled
-                ? 'Couleurs auto'
-                : palettes[settings.palette].name
-            }}</span>
-          </div>
-          <div class="palette-options">
-            <button
-              v-for="(palette, i) in palettes"
-              :key="palette.name"
-              :aria-label="`Palette ${palette.name}`"
-              :aria-pressed="settings.palette === i"
-              :title="palette.name"
-              :class="{ selected: settings.palette === i }"
-              :style="{ background: `linear-gradient(135deg, ${palette.colors.join(',')})` }"
-              @click="settings.palette = i"
-            >
-              <span v-if="settings.palette === i">✓</span>
-            </button>
-          </div>
-        </div>
-        <p class="scene-direction">{{ directionForScene(settings.scene).note }}</p>
-        <div class="render-controls">
-          <div class="section-label">
-            COMPOSITION <span>{{ currentScene.name }}</span>
-          </div>
-          <div class="control-group sliders">
-            <label
-              v-for="control in controls.filter(
-                (c) => !['sensitivity', 'bassGain'].includes(c.key) && (!c.orbital || isOrbital),
-              )"
-              :key="control.key"
-              :class="{
-                dimmed: control.orbital && !isOrbital,
-              }"
-              :title="
-                control.orbital && !isOrbital
-                  ? 'Disponible sur Orbital et Orbital Overdrive'
-                  : undefined
-              "
-              ><span
-                >{{ control.name
-                }}<output
-                  >{{
-                    control.unit === '%'
-                      ? Math.round(settings[control.key] * 100)
-                      : settings[control.key].toFixed(2)
-                  }}{{ control.unit }}</output
-                ></span
-              ><input
-                v-model.number="settings[control.key]"
-                type="range"
-                :min="control.min"
-                :max="control.max"
-                step=".01"
-                :disabled="control.orbital && !isOrbital"
-                :aria-label="control.name"
-              /><small
-                v-if="
-                  dynamicActive && dynamicControls[control.key] && (!control.orbital || isOrbital)
-                "
-                class="dynamic-effective"
-                >En direct : {{ dynamicValue(control.key, control.unit) }}</small
-              ></label
-            >
-          </div>
-        </div>
-        <div v-if="settings.scene !== 0" class="control-group motion-controls">
-          <div class="section-label">
-            SCULPTER LA SCÈNE <span>{{ currentScene.name }}</span>
-          </div>
-          <p class="motion-hint">
-            La musique fait le travail. Dose simplement l’énergie, le relief et les effets.
-          </p>
-          <div class="sliders">
-            <label v-for="control in raveControls" :key="control.key">
-              <span
-                >{{ control.name
-                }}<output>{{ Math.round(settings[control.key] * 100) }}%</output></span
-              >
-              <input
-                v-model.number="settings[control.key]"
-                type="range"
-                min="0"
-                :max="control.max"
-                step=".01"
-                :aria-label="control.name"
-              />
-              <small v-if="dynamicActive && dynamicControls[control.key]" class="dynamic-effective"
-                >En direct : {{ dynamicValue(control.key) }}</small
-              >
-            </label>
-          </div>
-          <label class="rave-toggle"
-            ><input
-              type="checkbox"
-              v-model="settings.bassRotation"
-              :disabled="settings.advancedMotion"
-            />
-            Tourner uniquement sur les basses</label
-          >
-          <details class="advanced-motion">
-            <summary>Réglages avancés des mouvements</summary>
-            <label class="rave-toggle"
-              ><input type="checkbox" v-model="settings.advancedMotion" /> Utiliser mes réglages
-              manuels</label
-            >
-            <p class="motion-hint">
-              Désactivé : les mouvements suivent automatiquement la musique. Activé : les réglages
-              ci-dessous prennent la main.
-            </p>
-            <fieldset :disabled="!settings.advancedMotion" class="motion-fieldset">
-              <div v-for="motion in motionChannels" :key="motion.key" class="motion-row">
-                <span>{{ motion.name }}</span>
-                <select
-                  v-model="settings[`${motion.key}Mode`]"
-                  :aria-label="`${motion.name} : mode`"
+                  v-for="control in controls.filter((c) =>
+                    ['sensitivity', 'bassGain'].includes(c.key),
+                  )"
+                  :key="control.key"
                 >
-                  <option value="continuous">Continu</option>
-                  <option value="audio">Audio uniquement</option>
-                  <option value="hybrid">Continu + audio</option>
-                </select>
-                <select
-                  v-model="settings[`${motion.key}Source`]"
-                  :disabled="settings[`${motion.key}Mode`] === 'continuous'"
-                  :aria-label="`${motion.name} : déclencheur`"
-                >
-                  <option value="bass">Basses</option>
-                  <option value="mid">Médiums</option>
-                  <option value="high">Aigus</option>
-                  <option value="beat">Frappes détectées</option>
-                </select>
-              </div>
-              <div class="sliders motion-sliders">
-                <label v-for="control in motionControls" :key="control.key">
                   <span
                     >{{ control.name
-                    }}<output>{{ Math.round(settings[control.key] * 100) }}%</output></span
+                    }}<output>{{ settings[control.key].toFixed(2) }}×</output></span
                   >
                   <input
                     v-model.number="settings[control.key]"
@@ -1749,104 +1324,549 @@ onBeforeUnmount(() => {
                     :min="control.min"
                     :max="control.max"
                     step=".01"
+                    :aria-label="control.name"
                   />
                 </label>
               </div>
-            </fieldset>
-          </details>
-        </div>
-        <div v-if="isOrbital" class="control-group">
-          <div class="section-label">COUCHES ORBITAL</div>
-          <div class="layer-buttons">
-            <button
-              v-for="layer in layers"
-              :key="layer.key"
-              :class="{ selected: settings[layer.key] }"
-              :aria-pressed="settings[layer.key]"
-              :disabled="!isOrbital"
-              @click="settings[layer.key] = !settings[layer.key]"
+            </details>
+            <AudioCalibration
+              :settings="settings"
+              :levels="stats"
+              :automatic="autoCalibration"
+              @toggle-auto="toggleAutoCalibration"
+              @manual="stopAutoCalibration"
+              @change="Object.assign(settings, $event)"
+            />
+            <p class="motion-hint">
+              Branche ta musique : les frappes déclenchent les impacts et les flashs
+              automatiquement.
+            </p>
+          </div>
+          <div class="local-note">
+            <span>⌁</span>
+            <p>Le son reste sur ton ordinateur.<br />Aucun fichier envoyé en ligne.</p>
+          </div>
+        </aside>
+
+        <aside
+          v-show="activeDeskTab === 'mix'"
+          id="desk-panel-mix"
+          role="tabpanel"
+          aria-labelledby="desk-tab-mix"
+          tabindex="0"
+          class="controls-panel panel"
+        >
+          <div class="panel-heading">
+            <span class="eyebrow">02 / MIX VISUEL</span
+            ><button
+              class="text-button"
+              @click="resetVisualMix"
+              title="Réinitialiser le mix visuel en conservant la scène et la calibration audio"
             >
-              {{ layer.label }}
+              ↺ Réinitialiser
             </button>
           </div>
-        </div>
-        <details class="studio-drawer output-settings">
-          <summary>Transitions et qualité</summary>
-          <div class="control-group compact-controls">
-            <label
-              ><span>Transition</span
-              ><select v-model.number="settings.transition">
-                <option :value="0">Cut direct</option>
-                <option :value="0.6">Rapide · 0,6 s</option>
-                <option :value="1.5">Fluide · 1,5 s</option>
-                <option :value="3">Lente · 3 s</option>
-              </select></label
-            ><label
-              ><span>Qualité</span
-              ><select v-model="settings.quality">
-                <option value="auto">Auto · adaptative</option>
-                <option value="eco">Éco · léger</option>
-                <option value="high">Haute · jusqu’à 1080p</option>
-              </select></label
-            ><label
-              ><span>Passage visuel</span
-              ><select v-model="settings.transitionStyle" aria-label="Style de transition">
-                <option value="breathe">Ouverture progressive</option>
-                <option value="fade">Fondu simple</option>
-              </select></label
-            >
-          </div>
-        </details>
-        <details class="studio-drawer preset-drawer">
-          <summary>Mes presets · {{ savedPresets.length }}</summary>
-          <div class="presets control-group">
-            <div class="section-label">
-              MES PRESETS <span>{{ savedPresets.length.toString().padStart(2, '0') }}</span>
+          <section v-if="settings.liveMode" class="live-console control-group live-enabled">
+            <template v-if="settings.liveMode">
+              <p class="motion-hint">
+                La scène continue de vivre. Déclenche les impacts toi-même, même sans musique.
+              </p>
+              <div class="live-pads">
+                <button
+                  v-for="pad in livePads"
+                  :key="pad.action"
+                  type="button"
+                  :class="{ 'pad-active': liveActive === pad.action }"
+                  :disabled="settings.frozen || settings.blackout"
+                  :aria-keyshortcuts="pad.key.toLowerCase()"
+                  @pointerdown="
+                    (event) => {
+                      if (event.button === 0) {
+                        event.preventDefault()
+                        triggerLive(pad.action)
+                      }
+                    }
+                  "
+                  @click="
+                    (event) => {
+                      if (event.detail === 0) triggerLive(pad.action)
+                    }
+                  "
+                >
+                  <kbd>{{ pad.key }}</kbd
+                  ><strong>{{ pad.name }}</strong
+                  ><small>{{ pad.hint }}</small>
+                </button>
+                <button
+                  type="button"
+                  class="boost-pad"
+                  :class="{ 'pad-active': boostHeld }"
+                  :disabled="settings.frozen || settings.blackout"
+                  aria-keyshortcuts="u"
+                  @pointerdown="boostPointer"
+                  @pointerup="releaseBoostPointer"
+                  @pointercancel="releaseBoostPointer"
+                  @lostpointercapture="releaseBoostPointer"
+                  @keydown.space.prevent.stop="setBoostInput('button-space', true)"
+                  @keyup.space.prevent.stop="setBoostInput('button-space', false)"
+                  @keydown.enter.prevent.stop="setBoostInput('button-enter', true)"
+                  @keyup.enter.prevent.stop="setBoostInput('button-enter', false)"
+                  @blur="releaseBoostKeyboard"
+                >
+                  <kbd>U</kbd><strong>Boost</strong><small>Maintenir pour accélérer</small>
+                </button>
+              </div>
+              <p class="motion-hint" v-if="settings.frozen || settings.blackout">
+                Réactive l’image pour utiliser les pads.
+              </p>
+              <p class="motion-hint" v-else>
+                J · frappe / K · flash / L · explosion / U maintenu · boost. Désactive le mode pour
+                retrouver l’automatique.
+              </p>
+            </template>
+          </section>
+          <div class="mix-deck">
+            <div class="mix-manual">
+              <div class="control-group palette-group">
+                <div class="section-label">
+                  PALETTE
+                  <span>{{
+                    dynamicActive && settings.dynamicColorEnabled
+                      ? 'Couleurs auto'
+                      : palettes[settings.palette].name
+                  }}</span>
+                </div>
+                <div class="palette-options">
+                  <button
+                    v-for="(palette, i) in palettes"
+                    :key="palette.name"
+                    :aria-label="`Palette ${palette.name}`"
+                    :aria-pressed="settings.palette === i"
+                    :title="palette.name"
+                    :class="{ selected: settings.palette === i }"
+                    :style="{ background: `linear-gradient(135deg, ${palette.colors.join(',')})` }"
+                    @click="settings.palette = i"
+                  >
+                    <span v-if="settings.palette === i">✓</span>
+                  </button>
+                </div>
+              </div>
+              <p class="scene-direction">{{ directionForScene(settings.scene).note }}</p>
+              <div class="render-controls">
+                <div class="section-label">
+                  COMPOSITION <span>{{ currentScene.name }}</span>
+                </div>
+                <div class="control-group sliders">
+                  <label
+                    v-for="control in controls.filter(
+                      (c) =>
+                        !['sensitivity', 'bassGain'].includes(c.key) && (!c.orbital || isOrbital),
+                    )"
+                    :key="control.key"
+                    :class="{
+                      dimmed: control.orbital && !isOrbital,
+                    }"
+                    :title="
+                      control.orbital && !isOrbital
+                        ? 'Disponible sur Orbital et Orbital Overdrive'
+                        : undefined
+                    "
+                    ><span
+                      >{{ control.name
+                      }}<output
+                        >{{
+                          control.unit === '%'
+                            ? Math.round(settings[control.key] * 100)
+                            : settings[control.key].toFixed(2)
+                        }}{{ control.unit }}</output
+                      ></span
+                    ><input
+                      v-model.number="settings[control.key]"
+                      type="range"
+                      :min="control.min"
+                      :max="control.max"
+                      step=".01"
+                      :disabled="control.orbital && !isOrbital"
+                      :aria-label="control.name"
+                    /><small
+                      v-if="
+                        dynamicActive &&
+                        dynamicControls[control.key] &&
+                        (!control.orbital || isOrbital)
+                      "
+                      class="dynamic-effective"
+                      >En direct : {{ dynamicValue(control.key, control.unit) }}</small
+                    ></label
+                  >
+                </div>
+              </div>
+              <div v-if="settings.scene !== 0" class="control-group motion-controls">
+                <div class="section-label">
+                  SCULPTER LA SCÈNE <span>{{ currentScene.name }}</span>
+                </div>
+                <p class="motion-hint">
+                  La musique fait le travail. Dose simplement l’énergie, le relief et les effets.
+                </p>
+                <div class="sliders">
+                  <label v-for="control in raveControls" :key="control.key">
+                    <span
+                      >{{ control.name
+                      }}<output>{{ Math.round(settings[control.key] * 100) }}%</output></span
+                    >
+                    <input
+                      v-model.number="settings[control.key]"
+                      type="range"
+                      min="0"
+                      :max="control.max"
+                      step=".01"
+                      :aria-label="control.name"
+                    />
+                    <small
+                      v-if="dynamicActive && dynamicControls[control.key]"
+                      class="dynamic-effective"
+                      >En direct : {{ dynamicValue(control.key) }}</small
+                    >
+                  </label>
+                </div>
+                <label class="rave-toggle"
+                  ><input
+                    type="checkbox"
+                    v-model="settings.bassRotation"
+                    :disabled="settings.advancedMotion"
+                  />
+                  Tourner uniquement sur les basses</label
+                >
+                <details class="advanced-motion">
+                  <summary>Réglages avancés des mouvements</summary>
+                  <label class="rave-toggle"
+                    ><input type="checkbox" v-model="settings.advancedMotion" /> Utiliser mes
+                    réglages manuels</label
+                  >
+                  <p class="motion-hint">
+                    Désactivé : les mouvements suivent automatiquement la musique. Activé : les
+                    réglages ci-dessous prennent la main.
+                  </p>
+                  <fieldset :disabled="!settings.advancedMotion" class="motion-fieldset">
+                    <div v-for="motion in motionChannels" :key="motion.key" class="motion-row">
+                      <span>{{ motion.name }}</span>
+                      <select
+                        v-model="settings[`${motion.key}Mode`]"
+                        :aria-label="`${motion.name} : mode`"
+                      >
+                        <option value="continuous">Continu</option>
+                        <option value="audio">Audio uniquement</option>
+                        <option value="hybrid">Continu + audio</option>
+                      </select>
+                      <select
+                        v-model="settings[`${motion.key}Source`]"
+                        :disabled="settings[`${motion.key}Mode`] === 'continuous'"
+                        :aria-label="`${motion.name} : déclencheur`"
+                      >
+                        <option value="bass">Basses</option>
+                        <option value="mid">Médiums</option>
+                        <option value="high">Aigus</option>
+                        <option value="beat">Frappes détectées</option>
+                      </select>
+                    </div>
+                    <div class="sliders motion-sliders">
+                      <label v-for="control in motionControls" :key="control.key">
+                        <span
+                          >{{ control.name
+                          }}<output>{{ Math.round(settings[control.key] * 100) }}%</output></span
+                        >
+                        <input
+                          v-model.number="settings[control.key]"
+                          type="range"
+                          :min="control.min"
+                          :max="control.max"
+                          step=".01"
+                        />
+                      </label>
+                    </div>
+                  </fieldset>
+                </details>
+              </div>
+              <div v-if="isOrbital" class="control-group">
+                <div class="section-label">COUCHES ORBITAL</div>
+                <div class="layer-buttons">
+                  <button
+                    v-for="layer in layers"
+                    :key="layer.key"
+                    :class="{ selected: settings[layer.key] }"
+                    :aria-pressed="settings[layer.key]"
+                    :disabled="!isOrbital"
+                    @click="settings[layer.key] = !settings[layer.key]"
+                  >
+                    {{ layer.label }}
+                  </button>
+                </div>
+              </div>
             </div>
-            <div v-if="savedPresets.length" class="preset-row">
-              <select
-                v-model="presetSelection"
-                aria-label="Charger un preset"
-                @change="applyPreset"
+            <div class="mix-assist">
+              <section v-if="isAdaptivePrism" class="control-group prism-controls">
+                <div class="section-label">PRISME · 5 NIVEAUX</div>
+                <label class="prism-mode"
+                  >Progression
+                  <select v-model.number="settings.prismLevel" aria-label="Niveau du Prisme">
+                    <option :value="0">Automatique · suit la musique</option>
+                    <option v-for="(name, index) in prismLevels" :key="name" :value="index + 1">
+                      {{ index + 1 }} · {{ name }}
+                    </option>
+                  </select>
+                </label>
+                <div
+                  class="prism-steps"
+                  role="meter"
+                  aria-label="Densité du Prisme"
+                  aria-valuemin="1"
+                  aria-valuemax="5"
+                  :aria-valuenow="1 + Math.round(prismState.level * 4)"
+                >
+                  <i
+                    v-for="n in 5"
+                    :key="n"
+                    :class="{ active: n <= 1 + Math.round(prismState.level * 4) }"
+                  ></i>
+                </div>
+                <p class="motion-hint">
+                  {{ prismLevels[Math.round(prismState.level * 4)] }} · Les médiums dessinent les
+                  facettes, les aigus la dentelle ; les basses ouvrent les grandes couches. La
+                  densité évolue en fondu, même sans Mix auto.
+                </p>
+              </section>
+              <section
+                class="control-group dynamic-mix"
+                :class="{ 'dynamic-enabled': dynamicActive }"
               >
-                <option value="" disabled>Choisir un preset</option>
-                <option v-for="preset in savedPresets" :key="preset.name" :value="preset.name">
-                  {{ preset.name }}
-                </option></select
-              ><button
-                class="icon-button"
-                :disabled="!presetSelection"
-                @click="removePreset"
-                aria-label="Supprimer le preset sélectionné"
-              >
-                ×
-              </button>
+                <label class="live-switch">
+                  <span>MIX AUTO <small>Suit l’énergie de la musique</small></span>
+                  <input
+                    v-model="settings.dynamicMix"
+                    type="checkbox"
+                    role="switch"
+                    aria-label="Activer le mix visuel automatique"
+                  />
+                </label>
+                <div class="mix-profiles" role="group" aria-label="Caractère du mix automatique">
+                  <button
+                    v-for="profile in mixProfiles"
+                    :key="profile.name"
+                    :aria-pressed="
+                      settings.dynamicMix &&
+                      settings.dynamicAmount === profile.amount &&
+                      settings.dynamicRelease === profile.release &&
+                      settings.dynamicFlash === profile.flash
+                    "
+                    @click="applyMixProfile(profile)"
+                  >
+                    {{ profile.name }}
+                  </button>
+                </div>
+                <template v-if="settings.dynamicMix">
+                  <p class="motion-hint" v-if="settings.liveMode">
+                    En pause pendant le mode live : tes commandes gardent la main.
+                  </p>
+                  <template v-else>
+                    <div
+                      class="dynamic-energy"
+                      role="meter"
+                      aria-label="Énergie du mix automatique"
+                      aria-valuemin="0"
+                      aria-valuemax="100"
+                      :aria-valuenow="Math.round(visualMixState.energy * 100)"
+                    >
+                      <span>{{ settings.frozen ? 'Figé' : passageNames[passage] }}</span>
+                      <div><i :style="{ width: `${visualMixState.energy * 100}%` }"></i></div>
+                      <output>{{ Math.round(visualMixState.energy * 100) }}%</output>
+                    </div>
+                    <details class="studio-drawer mix-settings" open>
+                      <summary>Réglages du mix auto</summary>
+                      <div class="sliders">
+                        <label
+                          ><span
+                            >Amplitude
+                            <output>{{ Math.round(settings.dynamicAmount * 100) }}%</output></span
+                          >
+                          <input
+                            v-model.number="settings.dynamicAmount"
+                            type="range"
+                            min="0"
+                            max="1"
+                            step="0.01"
+                            aria-label="Amplitude du mix automatique"
+                          />
+                        </label>
+                        <label
+                          ><span
+                            >Retour au calme
+                            <output>{{ settings.dynamicRelease.toFixed(1) }} s</output></span
+                          >
+                          <input
+                            v-model.number="settings.dynamicRelease"
+                            type="range"
+                            min="0.3"
+                            max="4"
+                            step="0.1"
+                            aria-label="Retour au calme du mix automatique"
+                          />
+                        </label>
+                      </div>
+                      <div class="sliders">
+                        <label
+                          ><span
+                            >Flashs auto
+                            <output>{{ Math.round(settings.dynamicFlash * 100) }}%</output></span
+                          >
+                          <input
+                            v-model.number="settings.dynamicFlash"
+                            type="range"
+                            min="0"
+                            max="1"
+                            step="0.01"
+                            aria-label="Dosage des flashs automatiques"
+                          />
+                        </label>
+                        <label v-if="[1, 32].includes(settings.scene)"
+                          ><span
+                            >Avancée du tunnel
+                            <output>{{ Math.round(settings.tunnelTravel * 100) }}%</output></span
+                          >
+                          <input
+                            v-model.number="settings.tunnelTravel"
+                            type="range"
+                            min="0"
+                            max="1"
+                            step="0.01"
+                            aria-label="Avancée du tunnel"
+                            :disabled="settings.advancedMotion"
+                          />
+                          <small class="motion-hint">{{
+                            settings.advancedMotion
+                              ? 'Pilotée par tes réglages manuels de déplacement.'
+                              : 'Dérive lente et poussées brèves sur les frappes.'
+                          }}</small>
+                        </label>
+                      </div>
+                    </details>
+                    <label class="rave-toggle"
+                      ><input v-model="settings.dynamicColorEnabled" type="checkbox" /> Couleurs
+                      auto</label
+                    >
+                    <div v-if="settings.dynamicColorEnabled" class="dynamic-colors">
+                      <label
+                        >Calme<input
+                          v-model="settings.dynamicCalmColor"
+                          type="color"
+                          aria-label="Couleur des passages calmes"
+                      /></label>
+                      <label
+                        >Ça tabasse<input
+                          v-model="settings.dynamicHotColor"
+                          type="color"
+                          aria-label="Couleur des passages intenses"
+                      /></label>
+                      <div
+                        class="dynamic-color-preview"
+                        :style="{
+                          background:
+                            visualMixState.values.dynamicColors?.[0] || settings.dynamicCalmColor,
+                        }"
+                        aria-label="Couleur actuelle du mix"
+                      ></div>
+                    </div>
+                    <p class="motion-hint">
+                      Les passages calmes sont plus sombres. Sur les frappes fortes, l’auto pousse
+                      le relief, le psychédélisme et les couleurs. Flashs auto à zéro désactive les
+                      flashs ajoutés ; tes flashs manuels restent réglables dans « Sculpter la scène
+                      ».
+                    </p>
+                  </template>
+                </template>
+              </section>
+              <details class="studio-drawer output-settings">
+                <summary>Transitions et qualité</summary>
+                <div class="control-group compact-controls">
+                  <label
+                    ><span>Transition</span
+                    ><select v-model.number="settings.transition">
+                      <option :value="0">Cut direct</option>
+                      <option :value="0.6">Rapide · 0,6 s</option>
+                      <option :value="1.5">Fluide · 1,5 s</option>
+                      <option :value="3">Lente · 3 s</option>
+                    </select></label
+                  ><label
+                    ><span>Qualité</span
+                    ><select v-model="settings.quality">
+                      <option value="auto">Auto · adaptative</option>
+                      <option value="eco">Éco · léger</option>
+                      <option value="high">Haute · jusqu’à 1080p</option>
+                    </select></label
+                  ><label
+                    ><span>Passage visuel</span
+                    ><select v-model="settings.transitionStyle" aria-label="Style de transition">
+                      <option value="breathe">Ouverture progressive</option>
+                      <option value="fade">Fondu simple</option>
+                    </select></label
+                  >
+                </div>
+              </details>
+              <details class="studio-drawer preset-drawer">
+                <summary>Mes presets · {{ savedPresets.length }}</summary>
+                <div class="presets control-group">
+                  <div class="section-label">
+                    MES PRESETS <span>{{ savedPresets.length.toString().padStart(2, '0') }}</span>
+                  </div>
+                  <div v-if="savedPresets.length" class="preset-row">
+                    <select
+                      v-model="presetSelection"
+                      aria-label="Charger un preset"
+                      @change="applyPreset"
+                    >
+                      <option value="" disabled>Choisir un preset</option>
+                      <option
+                        v-for="preset in savedPresets"
+                        :key="preset.name"
+                        :value="preset.name"
+                      >
+                        {{ preset.name }}
+                      </option></select
+                    ><button
+                      class="icon-button"
+                      :disabled="!presetSelection"
+                      @click="removePreset"
+                      aria-label="Supprimer le preset sélectionné"
+                    >
+                      ×
+                    </button>
+                  </div>
+                  <form class="preset-row" @submit.prevent="savePreset">
+                    <input
+                      v-model="presetName"
+                      aria-label="Nom du preset"
+                      placeholder="Nom du preset…"
+                      maxlength="40"
+                    /><button class="save-preset" type="submit" aria-label="Enregistrer le preset">
+                      ＋
+                    </button>
+                  </form>
+                  <div class="preset-links">
+                    <button @click="exportPreset">↓ Exporter</button
+                    ><button @click="presetInput.click()">↑ Importer</button>
+                  </div>
+                  <input
+                    ref="presetInput"
+                    type="file"
+                    accept="application/json,.json"
+                    class="sr-only"
+                    tabindex="-1"
+                    @change="importPreset"
+                  />
+                </div>
+              </details>
             </div>
-            <form class="preset-row" @submit.prevent="savePreset">
-              <input
-                v-model="presetName"
-                aria-label="Nom du preset"
-                placeholder="Nom du preset…"
-                maxlength="40"
-              /><button class="save-preset" type="submit" aria-label="Enregistrer le preset">
-                ＋
-              </button>
-            </form>
-            <div class="preset-links">
-              <button @click="exportPreset">↓ Exporter</button
-              ><button @click="presetInput.click()">↑ Importer</button>
-            </div>
-            <input
-              ref="presetInput"
-              type="file"
-              accept="application/json,.json"
-              class="sr-only"
-              tabindex="-1"
-              @change="importPreset"
-            />
           </div>
-        </details>
-      </aside>
+        </aside>
+      </section>
     </main>
     <footer class="statusbar">
       <div>

@@ -2791,3 +2791,944 @@ kbd {
   padding-left: 12px;
   border-left: 2px solid #485834;
 }
+
+/* Control desk: a compact monitor/library rail, with most space for live tuning. */
+.studio:not(.focus-mode) .workspace {
+  grid-template-columns: 280px minmax(320px, 0.9fr) minmax(440px, 1.5fr);
+  max-width: none;
+  gap: 24px;
+  padding: 22px 24px;
+}
+.studio:not(.focus-mode) .center-column {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.studio:not(.focus-mode) .preview-toolbar {
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.studio:not(.focus-mode) .preview-meta {
+  width: 100%;
+  justify-content: space-between;
+  gap: 8px;
+}
+.studio:not(.focus-mode) .visual-stage {
+  aspect-ratio: 16 / 9;
+  min-height: 0;
+  flex: none;
+}
+.studio:not(.focus-mode) .stage-top > span:last-child,
+.studio:not(.focus-mode) .stage-bottom {
+  display: none;
+}
+.studio:not(.focus-mode) .transport {
+  padding: 10px;
+  gap: 8px;
+  flex: none;
+}
+.studio:not(.focus-mode) .center-column > .performance-buttons {
+  margin: 8px 0 16px;
+  flex: none;
+}
+.studio:not(.focus-mode) .scenes-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.studio:not(.focus-mode) .scenes-heading {
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.studio:not(.focus-mode) .scene-count {
+  display: none;
+}
+.studio:not(.focus-mode) .library-tools {
+  margin-top: 12px;
+  gap: 6px;
+}
+.studio:not(.focus-mode) .scene-search input {
+  padding: 10px 8px;
+  font-size: 11px;
+}
+.studio:not(.focus-mode) .favorites-filter {
+  padding: 8px;
+  font-size: 10px;
+}
+.studio:not(.focus-mode) .scene-families {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  flex: none;
+  padding-bottom: 6px;
+}
+.studio:not(.focus-mode) .scene-families button {
+  flex: none;
+  padding: 6px 9px;
+}
+.studio:not(.focus-mode) .scene-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+  overflow-y: auto;
+  min-height: 100px;
+  padding: 2px 6px 8px 2px;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: #46513a transparent;
+}
+.studio:not(.focus-mode) .scene-art {
+  height: auto;
+  aspect-ratio: 16 / 7;
+}
+.studio:not(.focus-mode) .scene-footer {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding-top: 10px;
+  flex: none;
+}
+.studio:not(.focus-mode) .source-panel,
+.studio:not(.focus-mode) .controls-panel {
+  border: 0;
+  border-left: 1px solid var(--border);
+  padding: 0 12px 0 24px;
+  min-width: 0;
+  display: block;
+  grid-column: auto;
+  border-radius: 0;
+  background: none;
+}
+.studio:not(.focus-mode) .panel-heading {
+  margin-bottom: 18px;
+}
+.studio:not(.focus-mode) .source-panel h2 {
+  max-width: none;
+}
+.studio:not(.focus-mode) .controls-panel .eyebrow {
+  font-size: 11px;
+}
+
+@media (min-width: 1051px) {
+  .studio:not(.focus-mode) .center-column,
+  .studio:not(.focus-mode) .source-panel,
+  .studio:not(.focus-mode) .controls-panel {
+    position: sticky;
+    top: 18px;
+    height: calc(100dvh - 132px);
+    max-height: calc(100dvh - 36px);
+  }
+  .studio:not(.focus-mode) .source-panel,
+  .studio:not(.focus-mode) .controls-panel {
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    scrollbar-color: #46513a transparent;
+  }
+  .studio:not(.focus-mode) .scenes-panel {
+    flex: 1;
+  }
+}
+@media (max-width: 1050px) and (min-width: 701px) {
+  .studio:not(.focus-mode) .workspace {
+    grid-template-columns: 230px minmax(0, 1fr);
+    gap: 20px;
+  }
+  .studio:not(.focus-mode) .center-column {
+    grid-column: 1;
+    grid-row: 1 / 3;
+    position: sticky;
+    top: 16px;
+    height: calc(100dvh - 110px);
+  }
+  .studio:not(.focus-mode) .source-panel,
+  .studio:not(.focus-mode) .controls-panel {
+    grid-column: 2;
+    position: static;
+    max-height: none;
+    overflow: visible;
+  }
+}
+@media (max-width: 700px) {
+  .studio:not(.focus-mode) .workspace {
+    display: flex;
+    flex-direction: column;
+    padding: 16px;
+  }
+  .studio:not(.focus-mode) .center-column,
+  .studio:not(.focus-mode) .source-panel,
+  .studio:not(.focus-mode) .controls-panel {
+    position: static;
+    width: 100%;
+    max-height: none;
+    padding: 0;
+    border: 0;
+  }
+  .studio:not(.focus-mode) .source-panel {
+    order: 1;
+  }
+  .studio:not(.focus-mode) .controls-panel {
+    order: 2;
+  }
+  .studio:not(.focus-mode) .center-column {
+    order: 3;
+  }
+  .studio:not(.focus-mode) .scene-grid {
+    max-height: 420px;
+  }
+}
+
+/* Readable working controls, bounded preview, and short independent slider banks. */
+.studio:not(.focus-mode) .source-panel,
+.studio:not(.focus-mode) .controls-panel {
+  font-size: 14px;
+}
+.studio:not(.focus-mode) .sliders label > span,
+.studio:not(.focus-mode) .rave-toggle,
+.studio:not(.focus-mode) summary,
+.studio:not(.focus-mode) .live-switch small,
+.studio:not(.focus-mode) .source-tabs button {
+  font-size: 14px;
+}
+.studio:not(.focus-mode) .sliders output,
+.studio:not(.focus-mode) .dynamic-effective,
+.studio:not(.focus-mode) .mix-profiles button {
+  font-size: 12px;
+}
+.studio:not(.focus-mode) .section-label,
+.studio:not(.focus-mode) .eyebrow {
+  font-size: 12px;
+}
+.studio:not(.focus-mode) .motion-hint,
+.studio:not(.focus-mode) .intro,
+.studio:not(.focus-mode) .scene-direction {
+  font-size: 13px;
+  line-height: 1.6;
+}
+.studio:not(.focus-mode) input[type='range'] {
+  height: 22px;
+  background: transparent;
+  padding: 0;
+}
+.studio:not(.focus-mode) input[type='range']::-webkit-slider-runnable-track {
+  height: 4px;
+  background: #46503f;
+  border-radius: 4px;
+}
+.studio:not(.focus-mode) input[type='range']::-webkit-slider-thumb {
+  width: 14px;
+  height: 14px;
+  margin-top: -5px;
+}
+.studio:not(.focus-mode) input[type='range']::-moz-range-track {
+  height: 4px;
+  background: #46503f;
+}
+.studio:not(.focus-mode) .sliders {
+  gap: 16px;
+}
+.studio:not(.focus-mode) .sliders label > span {
+  margin-bottom: 5px;
+}
+.studio:not(.focus-mode) .demo-button {
+  margin: 14px 0 18px;
+}
+.studio:not(.focus-mode) .drop-zone {
+  min-height: 110px;
+  padding: 18px;
+}
+.mix-deck {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 20px;
+}
+.mix-manual,
+.mix-assist {
+  min-width: 0;
+}
+.studio:not(.focus-mode) .mix-manual,
+.studio:not(.focus-mode) .mix-assist {
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #121510;
+  align-self: start;
+}
+.studio:not(.focus-mode) .mix-assist > .control-group:first-child {
+  padding-top: 0;
+}
+.studio:not(.focus-mode) .palette-options {
+  gap: 10px;
+}
+.studio:not(.focus-mode) .scenes-heading {
+  margin-bottom: 0;
+}
+.studio:not(.focus-mode) .library-result {
+  margin: 0;
+  min-height: 24px;
+}
+.studio:not(.focus-mode) .scene-footer {
+  font-size: 10px;
+}
+.studio:not(.focus-mode) .scene-caption strong {
+  font-size: 13px;
+}
+.studio:not(.focus-mode) .scene-art {
+  aspect-ratio: 16 / 6;
+}
+.studio:not(.focus-mode) .calibration-bands {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+}
+.studio:not(.focus-mode) .calibration-band {
+  min-width: 0;
+  margin: 12px 0;
+}
+.studio:not(.focus-mode) .calibration-band label,
+.studio:not(.focus-mode) .calibration-band legend,
+.studio:not(.focus-mode) .calibration-auto {
+  font-size: 14px;
+}
+.studio:not(.focus-mode) .calibration-intro,
+.studio:not(.focus-mode) .calibration-help {
+  font-size: 12px;
+  line-height: 1.6;
+}
+@media (min-width: 1600px) {
+  .mix-deck {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 1250px) and (min-width: 1051px) {
+  .studio:not(.focus-mode) .workspace {
+    grid-template-columns: 230px minmax(290px, 1fr) minmax(340px, 1.2fr);
+    gap: 16px;
+    padding: 18px;
+  }
+  .studio:not(.focus-mode) .source-panel,
+  .studio:not(.focus-mode) .controls-panel {
+    padding-left: 16px;
+  }
+}
+
+/* Live desk typography: primary labels remain legible at a distance. */
+.studio:not(.focus-mode) .source-panel,
+.studio:not(.focus-mode) .controls-panel {
+  color: #edf0e9;
+  font-size: 16px;
+}
+.studio:not(.focus-mode) .panel-heading > .eyebrow {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  color: #f2f5ed;
+}
+.studio:not(.focus-mode) .section-label,
+.studio:not(.focus-mode) .live-switch > span {
+  font-size: 17px;
+  color: #e4eadc;
+  font-weight: 600;
+}
+.studio:not(.focus-mode) .section-label > span {
+  font-size: 14px;
+  color: #b9c6ac;
+}
+.studio:not(.focus-mode) .sliders label > span,
+.studio:not(.focus-mode) .rave-toggle,
+.studio:not(.focus-mode) summary,
+.studio:not(.focus-mode) .source-tabs button,
+.studio:not(.focus-mode) .calibration-band label,
+.studio:not(.focus-mode) .calibration-band legend {
+  font-size: 18px;
+  color: #edf0e9;
+}
+.studio:not(.focus-mode) .sliders output,
+.studio:not(.focus-mode) .calibration-band output {
+  font-size: 16px;
+  font-weight: 600;
+  color: #e8fbc9;
+}
+.studio:not(.focus-mode) .dynamic-effective,
+.studio:not(.focus-mode) .mix-profiles button,
+.studio:not(.focus-mode) .live-switch small,
+.studio:not(.focus-mode) .motion-hint,
+.studio:not(.focus-mode) .scene-direction,
+.studio:not(.focus-mode) .calibration-help,
+.studio:not(.focus-mode) .calibration-intro,
+.studio:not(.focus-mode) .calibration-auto,
+.studio:not(.focus-mode) .band-toggles button,
+.studio:not(.focus-mode) .source-instructions p,
+.studio:not(.focus-mode) .source-instructions > strong,
+.studio:not(.focus-mode) .source-panel .button,
+.studio:not(.focus-mode) .demo-button strong,
+.studio:not(.focus-mode) .intro {
+  font-size: 15px;
+  color: #c0cbb7;
+  line-height: 1.6;
+}
+.studio:not(.focus-mode) .panel-heading .text-button {
+  font-size: 14px;
+  color: #c0cbb7;
+}
+.studio:not(.focus-mode) .mix-manual,
+.studio:not(.focus-mode) .mix-assist {
+  background: #171c14;
+  border-color: #414b37;
+  padding: 22px;
+}
+.studio:not(.focus-mode) .sliders {
+  gap: 18px;
+}
+.studio:not(.focus-mode) .sliders label {
+  padding: 9px 0;
+}
+.studio:not(.focus-mode) input[type='range'] {
+  height: 28px;
+}
+.studio:not(.focus-mode) input[type='range']::-webkit-slider-runnable-track {
+  background: #626e54;
+  height: 5px;
+}
+.studio:not(.focus-mode) input[type='range']::-webkit-slider-thumb {
+  width: 18px;
+  height: 18px;
+  margin-top: -6.5px;
+}
+.studio:not(.focus-mode) input[type='range']::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+}
+.studio:not(.focus-mode) .calibration-band {
+  padding: 16px;
+  border-color: #4b5840;
+  background: #171c14;
+  border-radius: 8px;
+}
+.studio:not(.focus-mode) .calibration-band input[type='number'] {
+  font-size: 18px;
+  padding: 10px 8px;
+  color: #f1f5eb;
+}
+.studio:not(.focus-mode) .calibration-level output {
+  width: auto;
+}
+.studio:not(.focus-mode) .calibration-bands {
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+}
+.source-setup {
+  padding: 16px;
+  border: 1px solid #414b37;
+  border-radius: 8px;
+  background: #151a12;
+}
+.source-setup > summary {
+  cursor: pointer;
+  color: #e3edce;
+}
+.source-setup[open] > summary {
+  margin-bottom: 16px;
+}
+.studio:not(.focus-mode) .source-setup h2,
+.studio:not(.focus-mode) .source-setup .intro {
+  display: none;
+}
+.studio:not(.focus-mode) .dropzone {
+  min-height: 120px;
+  padding: 16px;
+}
+.studio:not(.focus-mode) .spectrum-bars {
+  height: 42px;
+}
+.studio:not(.focus-mode) .signal-panel {
+  margin-top: 18px;
+  padding-top: 18px;
+}
+.studio:not(.focus-mode) .audio-details .meter-row {
+  font-size: 15px;
+}
+.studio:not(.focus-mode) .source-panel .studio-drawer {
+  padding: 14px 0;
+}
+@media (max-width: 700px) {
+  .studio:not(.focus-mode) .mix-manual,
+  .studio:not(.focus-mode) .mix-assist {
+    padding: 16px;
+  }
+}
+
+.header-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  min-height: 44px;
+  border: 1px solid #4b5840;
+  border-radius: 6px;
+  color: #e3eadb;
+  font-size: 15px;
+  cursor: pointer;
+  white-space: nowrap;
+  position: relative;
+}
+.header-live.active {
+  background: #28361a;
+  border-color: var(--accent);
+  color: #e9ffc3;
+}
+.header-live input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+}
+.header-live:focus-within {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+.header-live-track {
+  width: 32px;
+  height: 18px;
+  border-radius: 12px;
+  background: #49513f;
+  padding: 3px;
+}
+.header-live-track::before {
+  content: '';
+  display: block;
+  height: 12px;
+  width: 12px;
+  border-radius: 50%;
+  background: #cad3bf;
+  transition: transform 150ms;
+}
+.header-live input:checked + .header-live-track {
+  background: #93b945;
+}
+.header-live input:checked + .header-live-track::before {
+  transform: translateX(14px);
+  background: #11170a;
+}
+@media (max-width: 700px) {
+  .topbar {
+    height: auto;
+    min-height: 100px;
+    flex-wrap: wrap;
+    padding-block: 12px;
+    gap: 12px;
+  }
+  .top-actions {
+    flex-wrap: wrap;
+  }
+  .header-live {
+    font-size: 13px;
+    min-height: 38px;
+    padding: 8px 10px;
+  }
+}
+
+.header-signal {
+  width: clamp(180px, 18vw, 320px);
+  flex: 0 1 320px;
+  min-width: 150px;
+}
+.header-signal .signal-title {
+  margin: 0 0 5px;
+  font-size: 12px;
+  color: #dbe5ce;
+}
+.header-signal .signal-state {
+  font-size: 10px;
+}
+.studio .header-signal .spectrum-bars {
+  height: 28px;
+  margin: 0;
+  padding-bottom: 3px;
+}
+.studio:not(.focus-mode) .band-meter {
+  font-size: 15px;
+}
+.studio:not(.focus-mode) .band-meter small {
+  font-size: 14px;
+}
+@media (max-width: 1250px) {
+  .topbar {
+    gap: 20px;
+  }
+  .topbar .session-name {
+    display: none;
+  }
+}
+@media (max-width: 700px) {
+  .header-signal {
+    flex: 1;
+    min-width: 130px;
+  }
+  .header-signal .signal-title {
+    font-size: 10px;
+  }
+  .top-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}
+@media (min-width: 1051px) and (max-height: 850px) {
+  .studio:not(.focus-mode) .scene-footer > span {
+    display: none;
+  }
+  .studio:not(.focus-mode) .scene-footer {
+    padding: 0;
+  }
+}
+
+/* One full-width settings workspace, switched without unmounting audio or controls. */
+.studio:not(.focus-mode) .workspace {
+  grid-template-columns: 280px minmax(0, 1fr);
+}
+.settings-desk {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  border-left: 1px solid var(--border);
+  padding-left: 24px;
+}
+.desk-tabs {
+  display: flex;
+  gap: 10px;
+  flex: none;
+  padding-bottom: 14px;
+  border-bottom: 1px solid #414b37;
+}
+.desk-tabs button {
+  padding: 14px 26px;
+  font-size: 20px;
+  font-weight: 600;
+  color: #bac5ae;
+  border-radius: 8px;
+}
+.desk-tabs button[aria-selected='true'] {
+  color: #eaffc6;
+  border-color: #b6db6c;
+  background: #2b381e;
+}
+.studio:not(.focus-mode) .settings-desk > .panel {
+  align-self: stretch;
+  width: 100%;
+  position: static;
+  height: auto;
+  max-height: none;
+  padding: 0 12px 20px 0;
+  border: 0;
+  min-height: 0;
+  flex: 1;
+  overflow-y: auto;
+  grid-column: auto;
+}
+.settings-desk .source-panel > .panel-heading,
+.settings-desk .controls-panel > .panel-heading > .eyebrow {
+  display: none;
+}
+.settings-desk .controls-panel > .panel-heading {
+  justify-content: flex-end;
+}
+.focus-mode .settings-desk {
+  display: none;
+}
+@media (min-width: 1051px) {
+  .settings-desk {
+    position: sticky;
+    top: 18px;
+    height: calc(100dvh - 132px);
+  }
+  .studio:not(.focus-mode) .settings-desk > .source-panel {
+    display: grid;
+    grid-template-columns: minmax(280px, 0.7fr) minmax(0, 1.7fr);
+    gap: 20px 28px;
+    align-content: start;
+    align-items: start;
+  }
+  .settings-desk .source-panel > .signal-panel {
+    display: contents;
+  }
+  .settings-desk .source-setup,
+  .settings-desk .audio-details,
+  .settings-desk .audio-tuning,
+  .settings-desk .local-note,
+  .settings-desk .error-box {
+    grid-column: 1;
+  }
+  .settings-desk .source-panel .audio-calibration {
+    grid-column: 2;
+    grid-row: 1 / 7;
+    margin-top: 0;
+    padding-top: 0;
+    border-top: 0;
+  }
+  .settings-desk .signal-panel > .motion-hint {
+    grid-column: 2;
+  }
+  .settings-desk .mix-deck {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 1050px) and (min-width: 701px) {
+  .studio:not(.focus-mode) .workspace {
+    grid-template-columns: 230px minmax(0, 1fr);
+  }
+  .studio:not(.focus-mode) .center-column {
+    grid-row: 1;
+  }
+  .settings-desk {
+    padding-left: 16px;
+  }
+}
+@media (max-width: 700px) {
+  .settings-desk {
+    order: 1;
+    width: 100%;
+    padding: 0;
+    border: 0;
+  }
+  .desk-tabs {
+    gap: 8px;
+  }
+  .desk-tabs button {
+    flex: 1;
+    font-size: 17px;
+    padding: 12px 10px;
+  }
+  .studio:not(.focus-mode) .settings-desk > .panel {
+    padding-right: 0;
+  }
+}
+
+.calibration-bands > .calibration-help {
+  grid-column: 1 / -1;
+}
+
+/* Compact desk: keep live controls together without oversized rows. */
+.studio:not(.focus-mode) .settings-desk {
+  gap: 12px;
+}
+.desk-tabs {
+  padding-bottom: 10px;
+}
+.desk-tabs button {
+  padding: 10px 22px;
+  font-size: 18px;
+}
+.studio:not(.focus-mode) .settings-desk .panel-heading {
+  margin-bottom: 8px;
+  min-height: 16px;
+}
+.studio:not(.focus-mode) .settings-desk .mix-manual,
+.studio:not(.focus-mode) .settings-desk .mix-assist {
+  padding: 14px 18px;
+}
+.studio:not(.focus-mode) .settings-desk .control-group {
+  padding: 10px 0;
+}
+.studio:not(.focus-mode) .settings-desk .sliders {
+  gap: 8px 22px;
+  padding-bottom: 8px;
+}
+.studio:not(.focus-mode) .settings-desk .sliders label {
+  padding: 2px 0;
+}
+.studio:not(.focus-mode) .settings-desk .sliders label > span,
+.studio:not(.focus-mode) .settings-desk .rave-toggle,
+.studio:not(.focus-mode) .settings-desk summary,
+.studio:not(.focus-mode) .settings-desk .calibration-band label,
+.studio:not(.focus-mode) .settings-desk .calibration-band legend {
+  font-size: 15px;
+}
+.studio:not(.focus-mode) .settings-desk .sliders output,
+.studio:not(.focus-mode) .settings-desk .calibration-band output {
+  font-size: 13px;
+}
+.studio:not(.focus-mode) .settings-desk .dynamic-effective {
+  font-size: 12px;
+  margin-top: 0;
+}
+.studio:not(.focus-mode) .settings-desk .section-label {
+  font-size: 14px;
+  margin-bottom: 10px;
+}
+.studio:not(.focus-mode) .settings-desk .section-label > span {
+  font-size: 12px;
+}
+.studio:not(.focus-mode) .settings-desk .motion-hint,
+.studio:not(.focus-mode) .settings-desk .scene-direction,
+.studio:not(.focus-mode) .settings-desk .calibration-help {
+  font-size: 12px;
+  line-height: 1.4;
+  margin: 6px 0 10px;
+}
+.studio:not(.focus-mode) .settings-desk .studio-drawer {
+  padding: 10px 0;
+}
+.studio:not(.focus-mode) .settings-desk .studio-drawer[open] > summary {
+  margin-bottom: 10px;
+}
+.studio:not(.focus-mode) .settings-desk .mix-settings {
+  margin: 8px 0;
+}
+.studio:not(.focus-mode) .settings-desk input[type='range'] {
+  height: 22px;
+}
+.studio:not(.focus-mode) .settings-desk .calibration-band {
+  padding: 10px 12px;
+  margin: 8px 0;
+}
+.studio:not(.focus-mode) .settings-desk .calibration-control {
+  margin-top: 10px;
+}
+.studio:not(.focus-mode) .settings-desk .calibration-level {
+  margin-bottom: 8px;
+}
+.studio:not(.focus-mode) .settings-desk .calibration-band input[type='number'] {
+  font-size: 15px;
+  padding: 7px 8px;
+}
+.studio:not(.focus-mode) .settings-desk .band-toggles {
+  margin: 10px 0;
+}
+.studio:not(.focus-mode) .settings-desk .band-toggles button {
+  padding: 7px;
+  font-size: 13px;
+}
+.studio:not(.focus-mode) .settings-desk .calibration-auto {
+  padding: 9px 12px;
+  font-size: 14px;
+  margin-top: 12px;
+}
+@media (min-width: 1250px) {
+  .settings-desk .render-controls .sliders,
+  .settings-desk .motion-controls > .sliders {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .settings-desk .calibration-options {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+  }
+}
+
+.topbar {
+  position: relative;
+}
+.topbar .desk-tabs {
+  border: 0;
+  padding: 0;
+  margin: 0 auto;
+  gap: 8px;
+}
+.topbar .desk-tabs button {
+  white-space: nowrap;
+  font-size: 16px;
+  padding: 11px 20px;
+}
+.topbar .top-actions {
+  margin-left: auto;
+}
+.focus-mode .topbar .desk-tabs {
+  display: none;
+}
+@media (min-width: 1800px) {
+  .topbar .desk-tabs {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+  }
+}
+@media (min-width: 701px) and (max-width: 1799px) {
+  .topbar .session-name {
+    display: none;
+  }
+  .topbar {
+    gap: 18px;
+  }
+  .topbar .header-signal {
+    flex-basis: 180px;
+  }
+}
+@media (min-width: 701px) and (max-width: 1100px) {
+  .topbar {
+    height: auto;
+    min-height: 120px;
+    flex-wrap: wrap;
+    padding-block: 12px;
+  }
+  .topbar .desk-tabs {
+    order: 4;
+    width: 100%;
+    justify-content: center;
+  }
+}
+@media (max-width: 700px) {
+  .topbar .desk-tabs {
+    order: 4;
+    width: 100%;
+  }
+  .topbar .desk-tabs button {
+    font-size: 15px;
+  }
+}
+
+.full-auto-button {
+  padding: 11px 16px;
+  font-size: 15px;
+  white-space: nowrap;
+  border: 1px solid #8ba65a;
+  color: #e1f5c0;
+  background: #202b17;
+}
+.full-auto-button[aria-pressed='true'] {
+  background: var(--accent);
+  color: #182009;
+  border-color: var(--accent);
+}
+@media (min-width: 701px) and (max-width: 1450px) {
+  .topbar {
+    height: auto;
+    min-height: 120px;
+    flex-wrap: wrap;
+    padding-block: 12px;
+  }
+  .topbar .desk-tabs {
+    order: 4;
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+/* Compact scene browser: all scenes, two previews per row. */
+.studio:not(.focus-mode) .scene-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  align-content: start;
+}
+.studio:not(.focus-mode) .scenes-heading {
+  margin: 0 0 10px;
+}
+.studio:not(.focus-mode) .scene-art {
+  aspect-ratio: 16 / 9;
+}
+.studio:not(.focus-mode) .scene-caption {
+  padding: 7px 6px;
+  gap: 3px;
+  min-height: 38px;
+}
+.studio:not(.focus-mode) .scene-caption strong {
+  font-size: 11px;
+  white-space: normal;
+  line-height: 1.25;
+}
+.studio:not(.focus-mode) .scene-caption kbd {
+  display: none;
+}
+.studio:not(.focus-mode) .scene-footer {
+  margin-top: 6px;
+}

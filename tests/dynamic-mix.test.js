@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { DynamicMix, dynamicControls } from '../src/visuals/DynamicMix.js'
+import { fullAutoSettings } from '../src/visuals/fullAuto.js'
 import { defaults, cleanSettings } from '../src/visuals/scenes.js'
 const silent = { bass: 0, mid: 0, high: 0, level: 0, beat: 0 }
 const loud = { bass: 0.9, mid: 0.8, high: 0.7, level: 0.9, beat: 1 }
@@ -20,7 +21,8 @@ test('loud passages increase the mix and silence smoothly calms every controlled
   }
   const immediate = { ...mix.update(1 / 60, silent, base) }
   assert.ok(immediate.speed > quiet.speed)
-  assert.ok(immediate.speed < strong.speed)
+  assert.ok(immediate.speed <= strong.speed, 'a saturated peak may briefly stay at the ceiling')
+  assert.ok(advance(mix, silent, 1).speed < strong.speed)
   const calm = advance(mix, silent, 12)
   assert.ok(calm.speed < base.speed * 0.5)
   assert.ok(mix.energy < 0.001)
@@ -116,4 +118,33 @@ test('automatic colours transition from calm to vivid, reset correctly and survi
   assert.equal(cleaned.dynamicHotColor, defaults.dynamicHotColor)
   assert.equal(cleaned.dynamicFlash, 1)
   assert.equal(cleaned.tunnelTravel, 0)
+})
+
+test('full automation keeps quiet passages dark and reserves maximum motion/density for sustained energy', () => {
+  const settings = cleanSettings({ ...defaults, ...fullAutoSettings })
+  const mix = new DynamicMix()
+  const quiet = advance(
+    mix,
+    { level: 0.04, bass: 0.05, mid: 0.03, high: 0.02, beat: 0 },
+    8,
+    60,
+    settings,
+  )
+  assert.ok(quiet.intensity < 0.2)
+  assert.ok(quiet.speed < 0.25)
+  assert.ok(quiet.detail < 0.4)
+  assert.equal(quiet.dynamicColors[0], '#080d1c')
+  const accent = { ...mix.update(1 / 60, loud, settings) }
+  assert.ok(accent.speed < 0.6, 'one accent is not a sustained climax')
+  const peak = advance(mix, loud, 5, 60, settings)
+  assert.equal(peak.detail, 1)
+  assert.equal(peak.speed, 2)
+  assert.equal(peak.intensity, 2)
+  assert.equal(peak.dynamicColors[0], settings.dynamicHotColor)
+  assert.ok(peak.raveDepth > 1.5 && peak.ravePsy > 1.5 && peak.raveFlash > 0.5)
+  const calm = advance(mix, silent, 12, 60, settings)
+  assert.ok(calm.speed < 0.1 && calm.intensity < 0.1)
+  assert.equal(calm.dynamicColors[0], settings.dynamicCalmColor)
+  assert.equal(settings.tunnelTravel, 0.3)
+  for (const band of ['bass', 'mid', 'high']) assert.equal(settings[band + 'Enabled'], true)
 })

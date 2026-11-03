@@ -96,7 +96,7 @@ export const defaults = {
   dynamicFlash: 0.45,
   tunnelTravel: 0.35,
   dynamicColorEnabled: true,
-  dynamicCalmColor: '#385b9f',
+  dynamicCalmColor: '#080d1c',
   dynamicHotColor: '#ff167a',
   orbitalDepth: 1,
   orbitalPsy: 1,

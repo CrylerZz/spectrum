@@ -3,9 +3,9 @@ import { dynamicPalette } from './dynamicColors.js'
 const clamp = (value, min = 0, max = 1) => Math.min(max, Math.max(min, value))
 // Multipliers at silence and at full musical energy, followed by render limits.
 export const dynamicControls = {
-  intensity: [0.2, 2.2, 0.2, 2],
-  speed: [0.2, 2.0, 0, 2],
-  detail: [0.65, 1.25, 0.2, 1],
+  intensity: [0.06, 2.2, 0.05, 2],
+  speed: [0.08, 2.0, 0, 2],
+  detail: [0.3, 1.25, 0.2, 1],
   glow: [0.15, 2.2, 0, 1],
   orbitalDepth: [0.2, 2.0, 0, 1.5],
   orbitalPsy: [0.08, 2.5, 0, 1.5],
@@ -16,7 +16,9 @@ export const dynamicControls = {
 }
 const controlEntries = Object.entries(dynamicControls)
 const peakTargets = {
-  intensity: 1.7,
+  intensity: 2.4,
+  speed: 2.6,
+  detail: 1.4,
   glow: 0.9,
   orbitalDepth: 1.5,
   orbitalPsy: 1.5,
@@ -67,7 +69,8 @@ export class DynamicMix {
     this.output.dynamicStrength = amount
     for (const [key, [quiet, loud, min, max]] of controlEntries) {
       if (!Number.isFinite(base[key])) continue
-      const peak = Math.max(base[key] * loud, peakTargets[key] ?? 0)
+      const peak =
+        key === 'speed' && base.speed === 0 ? 0 : Math.max(base[key] * loud, peakTargets[key] ?? 0)
       const target = base[key] * quiet * (1 - drive) + peak * drive
       this.output[key] = clamp(base[key] * (1 - amount) + amount * target, min, max)
     }
@@ -79,7 +82,7 @@ export class DynamicMix {
       const colorEnergy = this.music.color
       // Reuse perceptually identical colours instead of parsing three hex strings every frame.
       const step = Math.round(colorEnergy * 256) / 256
-      const calm = base.dynamicCalmColor ?? '#385b9f'
+      const calm = base.dynamicCalmColor ?? '#080d1c'
       const hotColor = base.dynamicHotColor ?? '#ff167a'
       const key = `${calm}:${hotColor}:${step}`
       if (key !== this.paletteKey) {
