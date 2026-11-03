@@ -8,9 +8,13 @@ const fs = require('node:fs'),
 const url = process.env.SPECTRUM_URL || 'http://127.0.0.1:5173'
 const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'spectrum-test-'))
 const chrome = spawn(
-  process.env.CHROME_PATH || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+  process.argv.find((arg) => arg.startsWith('--browser='))?.slice(10) ||
+    process.env.CHROME_PATH ||
+    '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
   [
     '--headless=new',
+    '--mute-audio',
+    '--enable-gpu',
     '--no-first-run',
     '--no-default-browser-check',
     `--user-data-dir=${profile}`,
@@ -92,6 +96,103 @@ let debugEval
     if (await ev("!!document.querySelector('.demo-button')")) break
   }
   assert.ok(await ev("!!document.querySelector('.demo-button')"), 'App mounted')
+  async function checkProjectionRecovery() {
+    await ev("document.querySelector('.output-button').click()")
+    await sleep(1500)
+    const targets = await call('Target.getTargets')
+    const output = targets.targetInfos.find((t) => t.url.includes('?output='))
+    assert.ok(output, 'Projection opened')
+    const { sessionId: o } = await call('Target.attachToTarget', {
+      targetId: output.targetId,
+      flatten: true,
+    })
+    const remote = async (expression) => {
+      const r = await call('Runtime.evaluate', { expression, returnByValue: true }, o)
+      if (r.exceptionDetails) throw new Error(JSON.stringify(r.exceptionDetails))
+      return r.result.value
+    }
+    assert.equal(await remote("!!document.querySelector('.projection-wait')"), false)
+    // Drop frame messages in the controller only, without touching the projection.
+    await ev(
+      "window.savedPost=BroadcastChannel.prototype.postMessage;BroadcastChannel.prototype.postMessage=function(data){if(data.type!=='frame')savedPost.call(this,data)}",
+    )
+    await sleep(3600)
+    assert.equal(await remote("!!document.querySelector('.projection-wait')"), true)
+    const held = await remote('window.__spectrumMetrics().time')
+    await sleep(300)
+    assert.equal(
+      await remote('window.__spectrumMetrics().time'),
+      held,
+      'Disconnected output holds last frame',
+    )
+    await ev('BroadcastChannel.prototype.postMessage=savedPost')
+    await sleep(600)
+    assert.equal(await remote("!!document.querySelector('.projection-wait')"), false)
+    const resumed = await remote('window.__spectrumMetrics().time')
+    await sleep(300)
+    assert.ok(
+      (await remote('window.__spectrumMetrics().time')) > resumed,
+      'Output resumes automatically',
+    )
+    await call('Target.closeTarget', { targetId: output.targetId })
+    console.log('PASS: projection connection, freeze after packet loss and automatic recovery')
+  }
+  if (process.argv.includes('--projection-only')) {
+    await checkProjectionRecovery()
+    assert.equal(errors.length, 0, JSON.stringify(errors))
+    return
+  }
+  if (process.argv.includes('--keyboard-only')) {
+    await ev("document.querySelector('.output-settings summary').focus()")
+    await call('Input.dispatchKeyEvent', { type: 'keyDown', key: ' ', code: 'Space' }, s)
+    await call('Input.dispatchKeyEvent', { type: 'keyUp', key: ' ', code: 'Space' }, s)
+    await sleep(150)
+    assert.equal(await ev("document.querySelector('.output-settings').open"), true)
+    assert.equal(
+      await ev(
+        "document.querySelector('.performance-buttons button').getAttribute('aria-pressed')",
+      ),
+      'false',
+    )
+    console.log('PASS: drawer keyboard activation does not freeze the stage')
+    return
+  }
+  if (process.argv.includes('--settings-only')) {
+    await ev(`(() => {
+      const set=(selector,value)=>{const input=document.querySelector(selector);input.value=value;input.dispatchEvent(new Event('input',{bubbles:true}));input.dispatchEvent(new Event('change',{bubbles:true}));};
+      set('[aria-label="Basses : gain"]', '1.7');
+      set('[aria-label="Sensibilité audio"]', '1.8');
+      set('[aria-label="Intensité"]', '1.6');
+      document.querySelectorAll('.scene-card')[4].click();
+      document.querySelectorAll('.scene-favorite')[4].click();
+    })()`)
+    await sleep(600)
+    await call('Page.reload', {}, s)
+    for (let i = 0; i < 100; i++) {
+      await sleep(100)
+      if (await ev("!!document.querySelector('.controls-panel')")) break
+    }
+    assert.equal(
+      await ev('Number(document.querySelector(\'[aria-label="Intensité"]\').value)'),
+      1.6,
+    )
+    assert.equal(
+      await ev("document.querySelectorAll('.scene-favorite')[4].getAttribute('aria-pressed')"),
+      'true',
+    )
+    await ev("document.querySelector('.controls-panel .panel-heading button').click()")
+    await sleep(600)
+    const saved = await ev("JSON.parse(localStorage.getItem('spectrum.settings.v1'))")
+    assert.equal(saved.scene, 8)
+    assert.equal(saved.bassTrim, 1.7)
+    assert.equal(saved.sensitivity, 1.8)
+    assert.equal(saved.intensity, 1)
+    assert.equal(errors.length, 0, JSON.stringify(errors))
+    console.log(
+      'PASS: mix and favourites restored after reload; visual reset preserves scene, calibration and audio sensitivity',
+    )
+    return
+  }
   for (let i = 0; i < 900; i++) {
     const state = await ev('window.__spectrumMetrics()')
     assert.deepEqual(state.failedScenes, [], 'Every scene compiles')
@@ -101,10 +202,75 @@ let debugEval
   const loaded = await ev('window.__spectrumMetrics()')
   assert.equal(loaded.readyScenes, await ev("document.querySelectorAll('.scene-card').length"))
   console.log(`PASS: ${loaded.readyScenes} scene programs preloaded`)
+  if (process.argv.includes('--lifecycle-only')) {
+    await ev(
+      `window.testStreams=[];const original=navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);navigator.mediaDevices.getUserMedia=async c=>{const stream=await original(c);testStreams.push(stream);return stream}`,
+    )
+    for (let cycle = 0; cycle < 12; cycle++) {
+      await ev("document.querySelector('.demo-button').click()")
+      await sleep(150)
+      assert.equal((await ev('window.__spectrumMetrics()')).source, 'demo')
+      await ev(
+        "document.querySelector('.stop-button').click();document.querySelectorAll('.source-tabs button')[2].click()",
+      )
+      await ev("document.querySelector('.source-instructions .button').click()")
+      for (let i = 0; i < 50; i++) {
+        await sleep(100)
+        if ((await ev('window.__spectrumMetrics()')).source === 'mic') break
+      }
+      assert.equal((await ev('window.__spectrumMetrics()')).source, 'mic')
+      await ev("document.querySelector('.stop-button').click()")
+      await sleep(100)
+      assert.equal((await ev('window.__spectrumMetrics()')).source, 'idle')
+      assert.equal(
+        await ev(
+          "testStreams.every(stream=>stream.getTracks().every(track=>track.readyState==='ended'))",
+        ),
+        true,
+      )
+    }
+    assert.equal(await ev('testStreams.length'), 12)
+    assert.equal(errors.length, 0, JSON.stringify(errors))
+    console.log('PASS: 24 source starts/stops; every fake capture track is released')
+    return
+  }
+
   assert.equal(
     await ev("document.querySelector('.graphics-error')?.textContent || ''"),
     '',
     'Shaders compile',
+  )
+  await ev("document.querySelectorAll('.scene-families button')[1].click()")
+  assert.equal(await ev("document.querySelectorAll('.scene-card').length"), 8)
+  await ev(
+    `(() => {const input=document.querySelector('.scene-search input');input.value='eclats';input.dispatchEvent(new Event('input',{bubbles:true}));})()`,
+  )
+  assert.equal(await ev("document.querySelectorAll('.scene-card').length"), 1)
+  assert.ok(await ev("document.querySelector('.scene-card').textContent.includes('Éclats')"))
+  await ev("document.querySelector('.scene-favorite').click()")
+  assert.deepEqual(await ev("JSON.parse(localStorage.getItem('spectrum.favorites.v1'))"), [72])
+  await ev("document.querySelector('.library-result button').click()")
+  await ev("document.querySelector('.favorites-filter').click()")
+  assert.equal(await ev("document.querySelectorAll('.scene-card').length"), 1)
+  await ev("document.querySelector('.library-result button').click()")
+  await ev("document.querySelector('.focus-button').click()")
+  assert.equal(
+    await ev("getComputedStyle(document.querySelector('.controls-panel')).display"),
+    'none',
+  )
+  await ev("document.querySelector('.focus-button').click()")
+  assert.notEqual(
+    await ev("getComputedStyle(document.querySelector('.controls-panel')).display"),
+    'none',
+  )
+  await ev("document.querySelectorAll('.mix-profiles button')[2].click()")
+  await sleep(400)
+  const profileSettings = await ev("JSON.parse(localStorage.getItem('spectrum.settings.v1'))")
+  assert.equal(profileSettings.dynamicMix, true)
+  assert.equal(profileSettings.dynamicAmount, 1)
+  await ev("document.querySelector('.controls-panel .panel-heading button').click()")
+  console.log(
+    'PASS: scene families, accent-insensitive search, independent favourites, focus mode and mix profiles',
   )
   await ev("document.querySelector('.demo-button').click()")
   await sleep(2200)
@@ -615,7 +781,7 @@ let debugEval
   await ev('clearInterval(sampleTimer)')
   assert.equal(errors.length, 0, JSON.stringify(errors))
   fs.writeFileSync('/tmp/spectrum-browser-results.json', JSON.stringify(results, null, 2))
-  console.log(JSON.stringify(results, null, 2))
+  console.log('Detailed results: /tmp/spectrum-browser-results.json')
   console.log('PASS: screenshots /tmp/spectrum-desktop.png and /tmp/spectrum-mobile.png')
 })()
   .catch(async (e) => {

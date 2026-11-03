@@ -80,7 +80,9 @@ test('waveform transients still detect kicks when compressed FFT levels stay fla
   const bins = new Uint8Array(1024).fill(180)
   const wave = new Uint8Array(2048)
   for (let i = 0; i < 600; i++) {
-    wave.fill(i % 30 < 7 ? 170 : 132)
+    const amplitude = i % 30 < 7 ? 70 : 3
+    for (let n = 0; n < wave.length; n++)
+      wave[n] = 128 + Math.round(amplitude * Math.sin((n * 2 * Math.PI * 80) / 48000))
     f.update(bins, wave, 1 / 60, i / 60)
   }
   assert.ok(Math.abs(f.values.bpm - 120) <= 2, String(f.values.bpm))

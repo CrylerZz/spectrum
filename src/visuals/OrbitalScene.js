@@ -185,7 +185,13 @@ export class OrbitalScene {
       depth = settings.orbitalDepth ?? 1
     const psy = settings.orbitalPsy ?? 1,
       hot =
-        Math.min(1, (settings.liveMode ? 0 : Math.max(0, (e - 0.76) / 0.18)) + impact * 0.35) * psy
+        Math.min(
+          1,
+          0.06 +
+            e * 0.12 +
+            (settings.liveMode ? 0 : Math.max(0, (e - 0.76) / 0.18)) +
+            impact * 0.35,
+        ) * psy
     const circle =
       (this.sample(spectrum, 43) + this.sample(spectrum, 86) + this.sample(spectrum, 129)) / 3
     for (let i = 0; i < 5; i++) {

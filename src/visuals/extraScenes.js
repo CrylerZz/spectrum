@@ -20,15 +20,16 @@ vec3 overdrive(vec2 p) {
     float punch=max(0.0,u_kick.x)*.6+u_impact*.35;
     vec2 q=hit.xy*turn(u_motion.x*.15+f*.15)/(1.25+punch);
 
+    q*=turn(u_orbitalImpact*.18*sin(f+length(q)*3.0));
     vec2 uv=.5+.5*q/aspect;
-    vec2 thickness=vec2(2.0+u_impact*3.0)/u_resolution;
+    vec2 thickness=vec2(1.0+u_settings.z*5.0+u_impact*3.0)/u_resolution;
     vec3 sampleColor=texture2D(u_orbital,clamp(uv,0.0,1.0)).rgb;
     sampleColor=max(sampleColor,texture2D(u_orbital,clamp(uv+vec2(thickness.x,0),0.0,1.0)).rgb);
     sampleColor=max(sampleColor,texture2D(u_orbital,clamp(uv-vec2(thickness.x,0),0.0,1.0)).rgb);
     sampleColor=max(sampleColor,texture2D(u_orbital,clamp(uv+vec2(0,thickness.y),0.0,1.0)).rgb);
     sampleColor=max(sampleColor,texture2D(u_orbital,clamp(uv-vec2(0,thickness.y),0.0,1.0)).rgb);
     float mask=step(0.0,uv.x)*step(uv.x,1.0)*step(0.0,uv.y)*step(uv.y,1.0);
-    col+=sampleColor*mask*exp(-z*.25)*(.5+.25*cos(f))*smoothstep(-.7,-.3,z)*(1.0-smoothstep(4.2,4.8,z));
+    col+=sampleColor*detailLayer(f,5.0)*mask*exp(-z*.25)*(.5+.25*cos(f))*smoothstep(-.7,-.3,z)*(1.0-smoothstep(4.2,4.8,z));
   }
   return col;
 }
@@ -44,7 +45,7 @@ vec3 prism(vec2 p) {
     q=abs(q*1.38-vec2(.43,.27));
     q*=turn(.3+sin(u_motion.y*.3+f)*.5);
     float d=min(abs(q.x-q.y*.65),abs(q.y-.12));
-    col += ink(d,.004,tint(f+r*2.0))/(1.0+f*.5);
+    col += ink(d,.004,tint(f+r*2.0))*detailLayer(f,5.0)/(1.0+f*.5);
   }
   return col*(.65+.35*cos(r*8.0-u_motion.z));
 }
@@ -56,7 +57,7 @@ vec3 gyro(vec2 p) {
     float f=float(i);
     vec2 q=p*turn(f*.35+u_motion.y*.2);
     q.y/= .18+.75*abs(sin(f*.3+u_motion.y*.25));
-    col+=ink(length(q)-(.4+f*.06),.006,tint(f*.7))*.7;
+    col+=ink(length(q)-(.4+f*.06),.006,tint(f*.7))*.7*detailLayer(f,9.0);
   }
   return col;
 }
@@ -82,7 +83,7 @@ vec3 prismAbyss(vec2 p) {
     vec2 q=p*mix(.65,1.8,z)*turn(u_motion.x*.12+f*.16);
     q+=.12*vec2(sin(u_motion.y*.3+f),cos(u_motion.y*.23+f));
     float fade=.35+.65*sin(z*PI);
-    col+=prism(q)*fade/(1.5+f*.6);
+    col+=prism(q)*fade*detailLayer(f,4.0)/(1.5+f*.6);
   }
   return col;
 }

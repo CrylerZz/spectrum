@@ -1,7 +1,7 @@
 // Five different compositions sharing the same progressive musical build.
 export const prismScenes = `
 float prismLayer(float index, float energy) {
-  return smoothstep(0.0,1.0,1.6+energy*6.4-index);
+  return smoothstep(0.0,1.0,1.6+energy*6.4*(.6+.4*u_settings.y)-index);
 }
 vec3 prismLace(vec2 p) {
   float e=u_prism.x, r=length(p);
@@ -12,6 +12,7 @@ vec3 prismLace(vec2 p) {
   vec3 col=vec3(0);
   for(int i=0;i<8;i++) {
     float f=float(i), visible=prismLayer(f,e);
+    if(visible<.001) break;
     q=abs(q*1.32-vec2(.38,.22));
     q*=turn(.24+sin(u_motion.y*.22+f)*(.18+u_prism.z*.22));
     float thread=min(abs(q.y-.1),abs(q.x-q.y*.72));
@@ -26,6 +27,7 @@ vec3 prismCrowns(vec2 p) {
   vec3 col=vec3(0);
   for(int i=0;i<8;i++) {
     float f=float(i), visible=prismLayer(f,e);
+    if(visible<.001) break;
     float phase=a+u_motion.x*.08*(mod(f,2.0)*2.0-1.0)+f*.14;
     float sector=mod(phase+PI/8.0,PI/4.0)-PI/8.0;
     float radius=.16+f*.18;
@@ -42,6 +44,7 @@ vec3 prismShards(vec2 p) {
   vec3 col=vec3(0);
   for(int i=0;i<8;i++) {
     float f=float(i), visible=prismLayer(f,e);
+    if(visible<.001) break;
     float angle=a+f*.17+sin(u_motion.y*.2+f)*.035;
     float fold=mod(angle+PI/7.0,TAU/7.0)-PI/7.0;
     vec2 q=vec2(cos(fold),sin(fold))*r;
@@ -58,6 +61,7 @@ vec3 prismSpiral(vec2 p) {
   vec3 col=vec3(0);
   for(int i=0;i<8;i++) {
     float f=float(i), visible=prismLayer(f,e);
+    if(visible<.001) break;
     float curl=a+r*(2.8+u_prism.z*.7)-u_motion.y*.2+f*.44;
     float arm=abs(sin(curl*3.0))*max(r,.08);
     float shell=abs(r-(.2+f*.14)-.08*sin(a*6.0+u_motion.y*.2+f));
@@ -76,6 +80,7 @@ vec3 prismCrystal(vec2 p) {
   vec3 col=vec3(0);
   for(int i=0;i<8;i++) {
     float f=float(i), visible=prismLayer(f,e);
+    if(visible<.001) break;
     float size=.42+f*.2;
     vec2 rotation=vec2(.5+u_motion.x*.12+f*.22,.35+sin(u_motion.y*.18+f*.4)*.2);
     vec3 top=spin3(vec3(0,1.35,0)*size,rotation);

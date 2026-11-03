@@ -82,10 +82,12 @@ vec3 latticeDepth(vec2 p) {
   vec3 col=vec3(0); float nearest=10000.0;
   for(int i=0;i<25;i++) {
     float f=float(i), x=mod(f,5.0)-2.0, y=floor(f/5.0)-2.0;
+    float visible=smoothstep(0.0,.6,.6+u_settings.y*2.0-max(abs(x),abs(y)));
+    if(visible<.001) continue;
     float wave=sin(length(vec2(x,y))*1.5-u_motion.z*2.0);
     vec3 center=spin3(vec3(x*.62,y*.62,wave*.65-u_kick.x*.3),vec2(.5+sin(u_motion.x*.2)*.25,.38));
     vec4 hit=cubeHit(p,center,vec3(.22,.22,.16+.15*(wave*.5+.5)),vec2(.5,.38),tint(f*.3+wave));
-    if(hit.w<nearest) { nearest=hit.w; col=hit.rgb; }
+    if(hit.w<nearest) { nearest=hit.w; col=hit.rgb*visible; }
   }
   return col;
 }

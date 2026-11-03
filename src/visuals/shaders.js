@@ -1,3 +1,4 @@
+import { directionForScene } from './sceneDirection.js'
 import { prismScenes } from './prismScenes'
 import { extraScenes } from './extraScenes'
 import { spectacleScenes } from './spectacleScenes'
@@ -14,6 +15,7 @@ void main() { gl_Position = vec4(a_position, 0.0, 1.0); }
 export const fragment = `
 precision highp float;
 uniform vec2 u_resolution;
+uniform float u_reveal;
 uniform float u_time;
 uniform vec3 u_motion; // accumulated rotation, deformation, travel
 uniform float u_impact;
@@ -73,9 +75,14 @@ vec3 orbital(vec2 p) {
 // Shared luminous strokes: a narrow core, a coloured shoulder and a soft halo.
 vec3 ink(float d, float width, vec3 tint) {
   d = abs(d);
+  width=max(width,.65/min(u_resolution.x,u_resolution.y));
   float core = exp(-d*d / max(width*width, 0.000001));
   float halo = exp(-d / (width*5.0 + .008));
   return tint*(core + halo*(.18 + u_settings.z*.75)) + vec3(core*core*.3);
+}
+// Continuous layer opacity prevents detail changes from popping whole shapes.
+float detailLayer(float index, float count) {
+  return smoothstep(0.0,1.0,1.5+u_settings.y*(count-1.5)-index);
 }
 vec3 tint(float x) {
   return mix(mix(u_c1,u_c2,.5+.5*sin(x)),u_c3,.25+.2*cos(x*1.7));
@@ -95,6 +102,8 @@ float field(vec2 p) {
 }
 
 vec3 liquid(vec2 p) {
+  p*=.8+u_settings.y*.3;
+  p+=u_audio.y*.025*vec2(sin(p.y*4.0+u_motion.y),cos(p.x*4.0-u_motion.y));
   // Procedural turbulent plasma, with folded currents rather than a fluid solver.
   p *= turn(u_motion.x*.18);
   float m=u_motion.y, t=u_motion.z;
@@ -176,9 +185,10 @@ vec3 finishedScene(int id, vec2 p) {
   }
   if(id>=59) {
     // Reference compositions own their depth, deformation and full-frame material.
-    vec2 framed=p/max(.5,1.0+u_kick.x*u_rave.y*(.06+u_dynamic.x*.18));
-    framed*=turn(u_dynamic.x*u_rave.z*.13*sin(length(p)*6.0-u_motion.y));
+    vec2 framed=p/max(.5,1.0+u_rave.y*.08+u_kick.x*u_rave.y*(.06+u_dynamic.x*.18));
+    framed*=turn(u_rave.z*.13*sin(length(p)*6.0-u_motion.y));
     vec3 composed=scene(id,framed)*u_settings.x*(.85+u_rave.x*.25+u_live.z*.5);
+    composed+=composed*composed*u_settings.z*.12;
     composed=mix(composed,composed.gbr,clamp(u_rave.z*.12,0.0,.3));
     composed=1.0-exp(-max(composed,vec3(0))*1.5);
     float flash=min(.8,u_kick.y*u_rave.w*.7);
@@ -188,7 +198,7 @@ vec3 finishedScene(int id, vec2 p) {
   float r=length(p), a=atan(p.y,p.x);
   float punch=u_kick.x*u_rave.y*1.0;
   // Perspective displacement: centre thrusts forward, edges lag behind, then recoil.
-  vec2 q=p/max(.35,1.0+punch*(.38+.3*exp(-r*r*2.0)));
+  vec2 q=p/max(.35,1.0+u_rave.y*.08+punch*(.38+.3*exp(-r*r*2.0)));
   q += p*sin(r*8.0-u_kick.z*24.0)*exp(-u_kick.z*7.0)*.055*u_rave.y;
   // Radial folding and torsion breathe with the hit; accumulated rotation is separate.
   float bend=psy*(.035*sin(r*9.0-u_motion.y)+u_impact*.07*sin(r*6.0));
@@ -270,8 +280,12 @@ function takeBranch(source, condition) {
 export function fragmentForScene(id) {
   const selected = sceneFunctions.get(id)
   if (!selected) throw new Error(`Scène inconnue : ${id}`)
+  const direction = directionForScene(id)
   const functions = new Map(shaderFunctions)
-  functions.set('scene', `vec3 scene(int id, vec2 p) { return ${selected}(p); }`)
+  functions.set(
+    'scene',
+    `vec3 scene(int id, vec2 p) { return ${selected}(p)*${direction.exposure.toFixed(3)}; }`,
+  )
   functions.set('sceneAtmosphere', atmosphereForScene(id))
   let finish = functions.get('finishedScene')
   for (const [sceneId, condition] of [
@@ -285,13 +299,20 @@ export function fragmentForScene(id) {
     }
     finish = finish.slice(0, branch.start) + finish.slice(branch.end)
   }
+  finish = finish.replace(
+    'vec3 depthLayer=sceneAtmosphere(q)',
+    `vec3 depthLayer=sceneAtmosphere(q)*${direction.atmosphere.toFixed(3)}`,
+  )
   functions.set('finishedScene', finish)
   functions.set(
     'main',
     `void main() {
     vec2 p = (gl_FragCoord.xy*2.0-u_resolution)/min(u_resolution.x,u_resolution.y);
-    vec3 color = finishedScene(${id},p);
-    gl_FragColor=vec4(dynamicGrade(color)*(1.0-u_settings.w),u_opacity);
+    float reveal=smoothstep(0.0,1.0,u_reveal);
+    vec3 color = finishedScene(${id},p*(1.0+.055*(1.0-reveal)));
+    float radius=length(p)/max(1.0,length(u_resolution/min(u_resolution.x,u_resolution.y)));
+    float opening=smoothstep(0.0,.25,reveal*1.25-radius*.25);
+    gl_FragColor=vec4(dynamicGrade(color)*(1.0-u_settings.w),u_opacity*opening);
   }`,
   )
   const used = new Set(),

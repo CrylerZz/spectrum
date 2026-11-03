@@ -8,7 +8,7 @@ float codeGlyph(vec2 uv, float seed) {
     float f=float(i), h=hash(vec2(seed,f));
     vec2 a=vec2(-.27+mod(f,2.0)*.54,-.34+floor(f/2.0)*.34);
     vec2 b=h>.5 ? a+vec2(.25,0) : a+vec2(0,.22);
-    strokes=max(strokes,exp(-segment(q,a,b)*65.0)*step(.17,h));
+    strokes=max(strokes,exp(-segment(q,a,b)*(90.0-u_settings.z*40.0))*step(.17,h));
   }
   return strokes;
 }
@@ -27,8 +27,8 @@ vec3 matrixRain(vec2 p) {
     float stream=exp(-tail*.19)*step(.18,seed);
     float glyph=codeGlyph(uv,hash(cell+f*31.0)*517.0+floor(u_motion.y*.6));
     vec3 c=mix(u_c1,u_c2,seed);
-    col+=c*glyph*stream*(.9-f*.15);
-    col+=vec3(glyph)*exp(-tail*3.0)*(.6-f*.1);
+    col+=c*glyph*stream*(.9-f*.15)*detailLayer(f,4.0);
+    col+=vec3(glyph)*exp(-tail*3.0)*(.6-f*.1)*detailLayer(f,4.0);
   }
   return col;
 }
@@ -37,7 +37,7 @@ vec3 dataTunnel(vec2 p) {
   float depth=1.5/radius;
   vec2 q=vec2(angle*8.0/PI,depth*2.0-u_motion.z*2.8);
   vec2 cell=floor(q), uv=fract(q);
-  float seed=hash(cell), glyph=codeGlyph(uv,seed*731.0);
+  float seed=hash(cell), glyph=codeGlyph(uv,seed*731.0)*smoothstep(.0,.15,u_settings.y-seed*.75);
   float packet=pow(max(0.0,sin(cell.y*.7+cell.x-u_motion.z*3.0)),8.0);
   vec3 col=tint(cell.x*.2)*glyph*(.25+packet)*( .5+radius*.3);
   float seams=min(min(uv.x,1.0-uv.x),min(uv.y,1.0-uv.y));
@@ -67,7 +67,7 @@ vec3 circuitBoard(vec2 p) {
 }
 
 vec3 digitalInterference(vec2 p) {
-  float row=floor(p.y*24.0), seed=hash(vec2(row,floor(u_motion.z*2.0)));
+  float row=floor(p.y*(10.0+u_settings.y*20.0)), seed=hash(vec2(row,floor(u_motion.z*2.0)));
   float glitch=u_live.x>.5 ? min(1.0,u_live.y+u_impact*.3) : min(1.0,u_impact*.35+u_audio.z*.25);
   vec2 q=p;
   q.x+=(seed-.5)*glitch*.45*step(.65,seed);
@@ -77,7 +77,7 @@ vec3 digitalInterference(vec2 p) {
   float pattern=waves*carrier;
   vec3 col=ink(pattern,.025,tint(pattern*4.0+q.y))* .8;
   col+=u_c2*exp(-abs(waves-carrier)*18.0)*(.1+u_audio.y*.3);
-  float scan=pow(max(0.0,cos(p.y*160.0)),8.0);
+  float scan=pow(max(0.0,cos(p.y*(65.0+u_settings.y*135.0))),8.0);
   col*=.65+.35*scan;
   col+=u_c3*step(.96,seed)*glitch*.25;
   return col;

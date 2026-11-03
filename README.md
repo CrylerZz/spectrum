@@ -47,13 +47,17 @@ Les réglages et jusqu’à 30 presets sont enregistrés dans le navigateur. Un 
 
 ### Mix au démarrage
 
-À chaque lancement, le mix revient à une base modérée : sensibilité 1×, réponse des basses 0,80×, intensité 1×, mouvement 0,65×, détail 70 %, halo 50 %, énergie 100 %, profondeur 45 %, psychédélisme 20 %, flashs 0 %. La rotation sur les basses est activée, la chorégraphie manuelle désactivée. La scène, la palette et les autres réglages enregistrés restent restaurés. Les presets sont conservés et peuvent être chargés après le démarrage pour retrouver leurs valeurs exactes.
+Le mix, la scène, la palette et la calibration sont restaurés au lancement. Le bouton « Réinitialiser » du mix restaure uniquement les réglages visuels : la source, la calibration, la sensibilité audio et la scène choisie restent conservées. Les commandes temporaires (noir, gel et mode live) sont désactivées au redémarrage.
+
+La bibliothèque propose des aperçus issus du moteur de rendu, une recherche insensible aux accents, cinq familles et des favoris enregistrés localement. Les filtres ne changent pas les raccourcis numériques ni le parcours de l’auto-pilote. « Mode scène » masque les panneaux latéraux pour agrandir le rendu.
+
+Trois profils de mix auto règlent ensemble son amplitude, son relâchement et ses flashs : **Subtil**, **Équilibré** et **Impact**. Les réglages restent modifiables après sélection. Les Prismes adaptatifs utilisent également le détail pour doser leurs couches et évitent le calcul des couches invisibles.
 
 ## Scènes et commandes
 
 Vortex parcourt un tunnel de cubes en relief ; Matrice devient une sculpture de blocs mobiles. Plasma, Prisme, Orbital original et Gyroscope gardent leurs compositions de référence.
 
-Le **Mode Rave** pilote automatiquement les scènes autres qu’Orbital original. Quatre curseurs dosent **Énergie**, **Coup de sub · profondeur**, **Psychédélisme** et **Flashs sur les frappes**. Les frappes et attaques de basses déclenchent une impulsion de profondeur avec recul amorti, des fronts lumineux et des flashs brefs. Les flashs suivent le son, sans stroboscope périodique ; leur curseur à zéro les supprime. Les transformations de perspective sont procédurales dans le shader.
+Le panneau **Sculpter la scène** (ancien Mode Rave) pilote automatiquement les scènes autres qu’Orbital original. Quatre curseurs dosent **Énergie**, **Coup de sub · profondeur**, **Psychédélisme** et **Flashs sur les frappes**. Les frappes et attaques de basses déclenchent une impulsion de profondeur avec recul amorti, des fronts lumineux et des flashs brefs. Les flashs suivent le son, sans stroboscope périodique ; leur curseur à zéro les supprime. Les transformations de perspective sont procédurales dans le shader.
 
 **Tourner uniquement sur les basses** conserve la rotation par impulsions. Les curseurs Sensibilité audio, Réponse des basses, Intensité, Mouvement, Détail et Halo restent accessibles directement. Seuls les réglages détaillés de chorégraphie sont repliés ; **Utiliser mes réglages manuels** réactive les choix de rotation, déformation, déplacement, force, inertie et seuil. Les anciens réglages manuels restent enregistrés mais ne pilotent plus le mouvement tant que cette option n'est pas activée. Les niveaux basses/médiums/aigus et BPM sont des indicateurs de lecture, désormais regroupés sous **Détails du signal audio**.
 
@@ -102,7 +106,7 @@ Les mouvements automatiques utilisent les frappes détectées, au lieu de relanc
 Le commutateur **MODE LIVE**, en haut du mix visuel, prend la main sur les déclenchements. Désactivé, les réactions automatiques et les réglages existants sont conservés. Activé, les scènes continuent d'évoluer et de réagir aux niveaux sonores, mais les frappes, flashs et explosions attendent les commandes du pupitre. Cela fonctionne sur les 33 scènes, y compris Orbital, même sans source audio.
 
 - **J / Frappe** : impulsion de profondeur et de mouvement, sans flash imposé.
-- **K / Flash** : éclair bref, dosé par le réglage Flashs du mode Rave.
+- **K / Flash** : éclair bref, dosé par le réglage Flashs de « Sculpter la scène ».
 - **L / Explosion** : dispersion, déformation et poussée amplifiée.
 - **U maintenu / Boost** : accélération et énergie supplémentaires ; relâcher revient progressivement au niveau initial.
 
@@ -154,15 +158,13 @@ Tests navigateur (avec `npm run dev` actif) :
 npm run test:browser
 ```
 
-Le script utilise Chrome headless via le protocole DevTools. Sur macOS, il cherche l’installation standard de Chrome. Ailleurs, définir `CHROME_PATH` ; `SPECTRUM_URL` peut remplacer l’URL locale. Les captures micro sont simulées par Chrome : aucun micro réel n’est ouvert. Les fichiers de test, captures et résultats sont écrits dans le répertoire temporaire `/tmp`.
+Les scripts navigateur utilisent Chrome headless via le protocole DevTools, avec la sortie sonore désactivée (`--mute-audio`) : l’analyse audio reste active pour les tests. Sur macOS, il cherche l’installation standard de Chrome. Ailleurs, définir `CHROME_PATH` ; `SPECTRUM_URL` peut remplacer l’URL locale. Les captures micro sont simulées par Chrome : aucun micro réel n’est ouvert. Les fichiers de test, captures et résultats sont écrits dans le répertoire temporaire `/tmp`.
 
 Le test ciblé `SPECTRUM_URL=http://127.0.0.1:5173 node tests/orbital.cjs` vérifie aussi la géométrie Orbital, les couches indépendantes, les palettes, le gel et les durées de vie bornées des vagues. Il produit des captures et une mesure à 1920 × 1080 dans `/tmp`.
 
 La suite existante a été écrite pour les six scènes initiales, la démo, la lecture d’un vrai WAV local, pause/reprise, les presets, le cycle de vie d’une capture simulée, l’absence de son partagé, la projection et le format mobile. Les mesures headless sont un diagnostic reproductible, pas une garantie de FPS sur une autre machine ou de compatibilité avec une table physique.
 
 L’interface ne contacte aucun serveur pour l’audio. Les polices Google Fonts peuvent être téléchargées par le navigateur ; les polices système prennent le relais hors ligne. Le build de production ne dépend pas d’un CDN JavaScript.
-
-Les derniers remaniements de scènes et variantes et la nouvelle détection audio n’ont pas été exécutés ni validés dans le navigateur : aucun test ni build lancé, conformément à la demande pour cette itération.
 
 ### Validation du 29 octobre 2026
 
@@ -209,3 +211,46 @@ Kaléidoscope mécanique, Citadelle cyan, Turbine industrielle, Machines néon e
 Les galaxies ont chacune une dérive orbitale, une rotation, un changement d’aplatissement et des bras qui se déforment ; les basses accentuent leur dilatation. Le rendu inclut les cellules voisines pour éviter de couper les galaxies à leurs frontières. Le budget de résolution des scènes coûteuses s’applique aussi à Galaxies néon et Rosace spectrale. Aucun test, build ou aperçu lancé pour cette révision.
 
 Mainstage a été retirée du catalogue et du préchargement. Ses anciens presets redirigent vers Laser Show, en conservant les autres réglages. Pour Citadelle cyan et Kaléidoscope mécanique, les grilles et fixations fines sont désormais calculées dans le matériau visible plutôt que dans la géométrie à chaque pas du rayon ; les volumes principaux et les liserés restent en 3D. Aucun test ni build lancé ; le gain de fluidité reste à mesurer.
+
+### Stabilité audio et projection
+
+Le tempo attend plusieurs intervalles cohérents avant de proposer une estimation, affiche sa stabilité et s’efface après trois secondes sans frappe. Les ajustements de seuil conservent l’historique ; changer la bande de détection le réinitialise. La calibration applique une première proposition après six secondes, puis limite ses corrections suivantes et ignore les petites variations.
+
+Si la projection ne reçoit plus de données pendant trois secondes, elle fige la dernière image ; elle reprend à la réception de nouvelles données.
+
+Pour régénérer les 33 aperçus avec le moteur réel, démarrer `npm run dev`, puis lancer `npm run render:covers` (Chrome requis). Les JPEG sont enregistrés dans `public/scenes` et inclus dans le build.
+
+### Validation du 3 novembre 2026
+
+- `npm test` : 38 tests réussis, dont tempo, calibration progressive, sélection des bandes, mix dynamique et bibliothèque.
+- `npm run test:browser` : 33 scènes, recherche/familles/favoris, profils du mix, mode scène, audio, projection et mobile vérifiés avec la sortie sonore désactivée.
+- `npm run test:browser -- --settings-only` : restauration du mix et des favoris après rechargement ; réinitialisation visuelle conservant scène, calibration et sensibilité.
+- `npm run build` : compilation de production réussie.
+
+Les captures des scènes sont livrées dans `public/scenes`. Les mesures headless de ce passage sont dans `/tmp/spectrum-browser-results.json` ; elles ne remplacent pas une écoute et une appréciation visuelle sur les morceaux utilisés en live.
+
+## Atelier live et direction musicale
+
+Les commandes Figer et Noir restent sous le lecteur, à côté du rendu. La sensibilité audio se trouve dans le panneau du signal. Les réglages fins du mix, les transitions/qualité et les presets sont repliables. Les commandes propres à Orbital sont affichées uniquement pour Orbital et Overdrive.
+
+Le mix sépare les accents brefs de l’énergie soutenue. Une frappe produit un accent immédiat ; la densité, les couleurs et les effets suivent une enveloppe plus lente. L’indicateur distingue introduction, montée, break, drop, passage intense et silence. Ce sont des estimations causales à partir du signal calibré, pas une reconnaissance de la structure du morceau. Les couleurs ont leur propre lissage, et le changement de source remet l’analyse de passage à zéro.
+
+L’auto-pilote attend la durée choisie, puis une frontière musicale estimée (groupe de quatre frappes détectées, drop ou break). Il attend au maximum huit secondes supplémentaires en l’absence de rythme fiable. La sélection manuelle reste immédiate. Deux styles de passage sont proposés : fondu simple et ouverture progressive. Figer suspend aussi la progression d’un fondu en cours.
+
+Les 33 scènes ont une direction explicite dans `src/visuals/sceneDirection.js` : rythme de rotation/déformation/déplacement, exposition, fond atmosphérique et dose de profondeur/psychédélisme. Le détail pilote des éléments propres à chaque composition (couches, gravures, fragments, densité des lignes). Les médiums déforment les formes sans piloter l’avancée des tunnels. Une courte indication sous la palette explique le comportement de la scène active.
+
+### Contrôles de cette passe
+
+- `npm test` : 43 tests, dont passages musicaux, accent isolé, transitions musicales et simulation d’une heure d’historique.
+- `npm run test:render` : compare les pixels pour détail, halo, relief et psychédélisme sur les 33 scènes (132 comparaisons). Le rapport est écrit dans `/tmp/spectrum-art-review.json`.
+- `npm run test:browser -- --projection-only` : coupe les messages de projection, vérifie le gel après trois secondes puis la reprise automatique.
+- `npm run test:browser -- --lifecycle-only` : alterne 24 démarrages/arrêts démo et capture simulée, vérifie la libération des pistes.
+- `npm run test:soak` : dix minutes **réelles** de rendu, avec changements de scène, passages calmes/intenses et mix automatique. Le script mesure les FPS et la mémoire après collecte, vérifie les ressources bornées et les erreurs WebGL. Le rapport progressif est écrit dans `/tmp/spectrum-soak-results.json`. `SOAK_SECONDS` permet de modifier cette durée (minimum 60 secondes).
+
+Tous les scripts navigateur utilisent `--mute-audio`. La capture micro est simulée. Les mesures headless caractérisent cette machine et cette configuration ; elles ne constituent pas une garantie de performance sur un autre appareil.
+
+Pour isoler les contrôles longs de l’utilisation de Chrome, fournir un exécutable **Chrome Headless Shell** avec `CHROME_PATH`. Exemple : `CHROME_PATH=/chemin/vers/chrome-headless-shell npm run test:soak`. Les FPS de ce navigateur de test peuvent différer de Chrome avec l’accélération graphique habituelle ; la stabilité de la mémoire et les erreurs sont contrôlées séparément.
+
+Le contrôle `npm run test:browser -- --keyboard-only` vérifie que la touche Espace ouvre les panneaux repliables sans déclencher le gel global.
+
+Validation d’endurance retenue : arrêt à la demande après plus de dix minutes sur Chrome Headless Shell avec accélération matérielle AMD Metal. Les relevés étaient à 60 FPS, la mémoire JavaScript autour de 1,9–2,0 Mo, sans erreur WebGL. La durée d’une heure n’a pas été validée ; le test dure désormais dix minutes par défaut.

@@ -16,7 +16,8 @@ export class AutoCalibration {
   constructor() {
     this.reset()
   }
-  reset() {
+  reset(keepHistory = false) {
+    if (!keepHistory) this.hasApplied = false
     this.frames = []
     this.elapsed = 0
     this.sampleElapsed = 0
@@ -43,8 +44,10 @@ export class AutoCalibration {
     this.frames.push({ frequency: frequency.slice(), decibels: decibels?.slice() })
     if (this.elapsed < 6 || this.frames.length < 20) return null
     const next = this.recommend(sampleRate, fftSize, settings)
-    this.reset()
-    return next
+    const result = this.hasApplied ? stabilizeCalibration(settings, next) : next
+    this.reset(true)
+    this.hasApplied = true
+    return result
   }
   recommend(sampleRate, fftSize, settings) {
     const patch = {}
@@ -112,4 +115,37 @@ export class AutoCalibration {
       patch.beatFloor = Math.round(bound(percentile(levelsDb, 0.2) - 6, -85, -20))
     return patch
   }
+}
+
+// Bound later corrections and ignore tiny changes, rather than moving every
+// control abruptly at the end of each analysis window.
+export function stabilizeCalibration(current, proposed) {
+  const patch = {}
+  for (const [key, target] of Object.entries(proposed)) {
+    const value = current[key]
+    if (!Number.isFinite(value)) {
+      patch[key] = target
+      continue
+    }
+    const frequency = key.endsWith('Hz')
+    const deadband = frequency
+      ? Math.max(20, value * 0.06)
+      : key.endsWith('Trim')
+        ? 0.1
+        : key === 'beatFloor'
+          ? 3
+          : 0.015
+    if (Math.abs(target - value) < deadband) continue
+    const step = frequency
+      ? Math.max(20, value * 0.15)
+      : key.endsWith('Trim')
+        ? 0.25
+        : key === 'beatFloor'
+          ? 3
+          : 0.02
+    const next = value + Math.max(-step, Math.min(step, (target - value) * 0.4))
+    patch[key] = frequency ? Math.round(next / 10) * 10 : Math.round(next * 100) / 100
+  }
+  const clean = cleanCalibration({ ...current, ...patch })
+  return Object.fromEntries(Object.keys(patch).map((key) => [key, clean[key]]))
 }

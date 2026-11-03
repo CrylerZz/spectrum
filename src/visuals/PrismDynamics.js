@@ -8,6 +8,10 @@ export class PrismDynamics {
     this.level = 0
     this.bands = [0, 0, 0]
   }
+  reset() {
+    this.level = 0
+    this.bands.fill(0)
+  }
   update(dt, audio, frozen = false) {
     if (frozen) return
     dt = Math.min(0.1, Math.max(0, Number.isFinite(dt) ? dt : 0))

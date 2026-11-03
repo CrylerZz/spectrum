@@ -38,7 +38,7 @@ vec3 retroResonance(vec2 p) {
     float glow=exp(-abs(d)*85.0)*(.08+u_settings.z*.14);
     vec3 c=mix(violet,gold,.5+.5*sin(offset));
     float depth=.45+.55*(.5+.5*sin(angle+rotation+offset*.12));
-    col+=c*(wire*.28+glow)*depth;
+    col+=c*(wire*.28+glow)*depth*detailLayer(f,16.0);
   }
   // Fine angular filaments stretch from a white-hot, flattened plasma knot.
   vec2 corePoint=turn(sin(phase*.6)*.55)*q;
@@ -56,7 +56,7 @@ vec3 retroResonance(vec2 p) {
     float strand=.14+f*.014+(.04+hit*.025)*sin(ca*5.0+phase+f*.7)+.023*turbulence;
     strand+=recoil*.035*sin(ca*3.0-phase+f*.4);
     float d=cr-strand;
-    col+=ink(d,.0025,mix(lime,gold,f/7.0))*.32;
+    col+=ink(d,.0025,mix(lime,gold,f/7.0))*.32*detailLayer(f,7.0);
   }
   float cloud=field(q*6.0+vec2(phase*.4,-phase*.2));
   col+=lime*envelope*(.5+cloud)*(.45+pressure*.35);

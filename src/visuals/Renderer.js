@@ -1,6 +1,7 @@
 import { vertex, fragmentForScene } from './shaders'
 import { palettes, scenes } from './scenes'
 import { OrbitalScene } from './OrbitalScene'
+import { directionForScene } from './sceneDirection.js'
 import { Motion } from './Motion'
 
 export class Renderer {
@@ -199,6 +200,7 @@ export class Renderer {
         'orbitalImpact',
         'orbitalTint',
         'opacity',
+        'reveal',
       ]) {
         uniforms[name] = gl.getUniformLocation(program, `u_${name}`)
       }
@@ -293,7 +295,7 @@ export class Renderer {
       this.resize()
     }
     const wasTransitioning = this.mix < 1
-    this.mix = s.transition <= 0 ? 1 : Math.min(1, this.mix + dt / s.transition)
+    this.mix = s.transition <= 0 ? 1 : Math.min(1, this.mix + (s.frozen ? 0 : dt) / s.transition)
     if (wasTransitioning && this.mix === 1) this.resize()
     if (!s.frozen) {
       this.spectrum.set(spectrum)
@@ -335,7 +337,8 @@ export class Renderer {
     const gl = this.gl,
       s = this.settings,
       entry = this.programs.get(id),
-      u = entry.uniforms
+      u = entry.uniforms,
+      direction = directionForScene(id)
     gl.useProgram(entry.program)
     gl.bindBuffer(gl.ARRAY_BUFFER, this.buffer)
     gl.enableVertexAttribArray(entry.position)
@@ -345,6 +348,7 @@ export class Renderer {
     gl.uniform1i(u.spectrum, 0)
     gl.uniform1i(u.orbital, 1)
     gl.uniform1f(u.opacity, opacity)
+    gl.uniform1f(u.reveal, s.transitionStyle === 'breathe' && id === this.scene ? this.mix : 1)
     gl.uniform1f(u.orbitalImpact, orbitalImpact)
     gl.uniform1f(u.orbitalTint, s.dynamicColors || s.palette !== 0 ? 1 : 0)
     const prism = s.prismSignal ?? [0, 0, 0, 0]
@@ -372,13 +376,18 @@ export class Renderer {
     }
     gl.uniform2f(u.resolution, this.canvas.width, this.canvas.height)
     gl.uniform1f(u.time, this.time)
-    gl.uniform3f(u.motion, ...this.motion.phases)
+    gl.uniform3f(
+      u.motion,
+      this.motion.phases[0] * direction.motion[0],
+      this.motion.phases[1] * direction.motion[1],
+      this.motion.phases[2] * direction.motion[2],
+    )
     gl.uniform1f(u.impact, this.motion.impact)
     gl.uniform4f(
       u.rave,
       s.raveEnergy ?? 1.5,
-      s.raveDepth ?? 1.2,
-      s.ravePsy ?? 1.1,
+      (s.raveDepth ?? 1.2) * direction.depth,
+      (s.ravePsy ?? 1.1) * direction.psy,
       s.raveFlash ?? 0.7,
     )
     gl.uniform4f(

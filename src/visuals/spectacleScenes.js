@@ -23,7 +23,7 @@ vec3 dimensionalRift(vec2 p) {
     float life=min(u_kick.z,2.0), y=(hash(vec2(f,3))-.5)*2.7;
     float x=.13*sin(y*2.7+u_motion.y*.3)+side*(width+life*(.4+hash(vec2(f,8))));
     vec2 point=vec2(x,y+sin(f)*life*.2);
-    col+=ink(segment(p,point,point+vec2(side*.035,.025)),.004,tint(f)) * exp(-life*4.0);
+    col+=ink(segment(p,point,point+vec2(side*.035,.025)),.004,tint(f)) * exp(-life*4.0)*detailLayer(f,20.0);
   }
   return col;
 }
@@ -36,7 +36,7 @@ float liquidMetalDistance(vec3 p) {
   vec3 n=p/max(.01,r);
   float flow=sin(n.x*5.0+u_motion.y)*sin(n.y*5.0-u_motion.y*.7)*sin(n.z*5.0+u_motion.y*.4);
   float spines=pow(max(0.0,sin(n.x*11.0+n.y*7.0)*cos(n.z*9.0-n.y*5.0)),7.0);
-  return r-(.95+flow*.13+spines*min(1.8,u_impact)*.28);
+  return r-(.95+flow*.13+spines*(.08*u_audio.y+.28*min(1.8,u_impact))*u_settings.y);
 }
 vec3 metalEnvironment(vec3 direction) {
   float strip=pow(max(0.0,cos(direction.y*10.0+direction.x*3.0)),24.0);
@@ -60,7 +60,7 @@ vec3 liquidMetal(vec2 p) {
   vec3 reflected=reflect(rd,n);
   float fresnel=pow(1.0-max(0.0,dot(n,-rd)),3.0);
   float highlight=pow(max(0.0,dot(reflect(normalize(vec3(-.5,-.8,1.0)),n),-rd)),50.0);
-  return metalEnvironment(reflected)*(.45+fresnel*.8)+vec3(highlight*.7)+u_c3*fresnel*.25;
+  return metalEnvironment(reflected)*(.45+fresnel*.8)+vec3(highlight*(.35+.35*u_settings.z+.25*u_audio.z))+u_c3*fresnel*.25;
 }
 
 `

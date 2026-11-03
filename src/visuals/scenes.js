@@ -69,7 +69,7 @@ export const palettes = [
   { name: 'Laser vert', colors: ['#52ff37', '#00d979', '#b9ff69'] },
   { name: 'Argent', colors: ['#dce1eb', '#828c9e', '#454d62'] },
 ]
-// Starting mix reapplied at launch; saved presets keep their own exact values.
+// Defaults for a fresh session; saved settings keep their own exact values.
 export const startupMix = {
   intensity: 1,
   speed: 0.65,
@@ -111,6 +111,7 @@ export const defaults = {
   motionThreshold: 0.16,
   quality: 'auto',
   transition: 1.5,
+  transitionStyle: 'breathe',
   auto: false,
   autoInterval: 24,
   liveMode: false, // Session-only: reopening the app starts in automatic mode.
@@ -178,6 +179,8 @@ export function cleanSettings(input) {
     'bassRotation',
   ])
     if (typeof input[key] === 'boolean') out[key] = input[key]
+  if (['fade', 'breathe'].includes(input.transitionStyle))
+    out.transitionStyle = input.transitionStyle
   if (['auto', 'eco', 'high'].includes(input.quality)) out.quality = input.quality
   for (const channel of ['rotation', 'deformation', 'travel']) {
     if (['continuous', 'audio', 'hybrid'].includes(input[`${channel}Mode`]))

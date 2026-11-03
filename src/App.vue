@@ -4,9 +4,12 @@ import { AutoCalibration } from './audio/AutoCalibration.js'
 import AudioCalibration from './components/AudioCalibration.vue'
 import { AudioEngine, audioError } from './audio/AudioEngine'
 import { PrismDynamics, prismLevels } from './visuals/PrismDynamics.js'
+import { passageNames, shouldAdvanceScene } from './visuals/MusicalForm.js'
 import { DynamicMix, dynamicControls } from './visuals/DynamicMix.js'
+import { sceneFamilies, filterScenes, cleanFavorites } from './visuals/library.js'
+import { directionForScene } from './visuals/sceneDirection.js'
 import { Renderer } from './visuals/Renderer'
-import { defaults, startupMix, cleanSettings, scenes, palettes } from './visuals/scenes'
+import { defaults, cleanSettings, scenes, palettes } from './visuals/scenes'
 
 const outputId = new URLSearchParams(location.search).get('output')
 const isOutput = !!outputId
@@ -14,10 +17,90 @@ let restored = defaults
 try {
   restored = cleanSettings(JSON.parse(localStorage.getItem('spectrum.settings.v1')))
 } catch {}
-restored = { ...restored, ...startupMix }
 const settings = reactive({ ...restored })
+const sceneQuery = ref(''),
+  sceneFamily = ref('all'),
+  onlyFavorites = ref(false),
+  focusMode = ref(false)
+const favorites = ref([])
+try {
+  favorites.value = cleanFavorites(
+    JSON.parse(localStorage.getItem('spectrum.favorites.v1')),
+    scenes,
+  )
+} catch {}
+const visibleScenes = computed(() =>
+  filterScenes(scenes, {
+    query: sceneQuery.value,
+    family: sceneFamily.value,
+    favorites: favorites.value,
+    onlyFavorites: onlyFavorites.value,
+  }),
+)
+function toggleFavorite(id) {
+  favorites.value = favorites.value.includes(id)
+    ? favorites.value.filter((value) => value !== id)
+    : [...favorites.value, id]
+  try {
+    localStorage.setItem('spectrum.favorites.v1', JSON.stringify(favorites.value))
+  } catch {}
+}
+function resetSceneFilters() {
+  sceneQuery.value = ''
+  sceneFamily.value = 'all'
+  onlyFavorites.value = false
+}
+const mixProfiles = [
+  { name: 'Subtil', amount: 0.45, release: 2.4, flash: 0.1 },
+  { name: 'Équilibré', amount: 0.75, release: 1.6, flash: 0.35 },
+  { name: 'Impact', amount: 1, release: 1.1, flash: 0.55 },
+]
+function applyMixProfile(profile) {
+  Object.assign(settings, {
+    dynamicMix: true,
+    dynamicAmount: profile.amount,
+    dynamicRelease: profile.release,
+    dynamicFlash: profile.flash,
+  })
+}
+function resetVisualMix() {
+  for (const key of [
+    'intensity',
+    'speed',
+    'detail',
+    'glow',
+    'orbitalDepth',
+    'orbitalPsy',
+    'raveEnergy',
+    'raveDepth',
+    'ravePsy',
+    'raveFlash',
+    'dynamicMix',
+    'dynamicAmount',
+    'dynamicRelease',
+    'dynamicFlash',
+    'dynamicColorEnabled',
+    'dynamicCalmColor',
+    'dynamicHotColor',
+    'tunnelTravel',
+    'prismLevel',
+    'advancedMotion',
+    'bassRotation',
+    'rotationMode',
+    'rotationSource',
+    'deformationMode',
+    'deformationSource',
+    'travelMode',
+    'travelSource',
+    'motionStrength',
+    'motionInertia',
+    'motionThreshold',
+  ])
+    settings[key] = defaults[key]
+}
 const engineSettings = { ...restored }
 const dynamicMix = new DynamicMix()
+const passage = ref('silence')
 const prismDynamics = new PrismDynamics()
 const prismState = reactive({ level: 0 })
 const isAdaptivePrism = computed(() => settings.scene >= 70 && settings.scene <= 74)
@@ -55,6 +138,7 @@ const stats = reactive({
   high: 0,
   level: 0,
   bpm: 0,
+  bpmConfidence: 0,
   beat: 0,
 })
 const bars = ref(Array(32).fill(0)),
@@ -87,6 +171,7 @@ let renderer,
 let remoteAudio = { bass: 0, mid: 0, high: 0, beat: 0 },
   remoteSpectrum = new Uint8Array(64),
   lastPacket = 0
+let remoteFrozen = false
 const channelId = outputId || crypto.randomUUID()
 const audio = new AudioEngine((reason) => {
   if (reason === 'capture-ended') {
@@ -322,7 +407,13 @@ function toast(message) {
   clearTimeout(toastTimer)
   toastTimer = setTimeout(() => (notice.value = ''), 4000)
 }
+function resetMusicalState() {
+  dynamicMix.reset()
+  prismDynamics.reset()
+  autoTime = 0
+}
 async function run(kind, name, action) {
+  resetMusicalState()
   const id = ++requestId
   busy.value = true
   error.value = ''
@@ -378,6 +469,7 @@ function capture(kind) {
   return run(kind, name, () => audio.capture(kind, deviceId.value))
 }
 function stop() {
+  resetMusicalState()
   requestId++
   audio.stop()
   busy.value = false
@@ -541,7 +633,7 @@ function keydown(event) {
   }
   if (
     event.target.closest?.('input,select,textarea,[contenteditable="true"]') ||
-    (event.target.closest?.('button') && [' ', 'Enter'].includes(event.key)) ||
+    (event.target.closest?.('button,summary') && [' ', 'Enter'].includes(event.key)) ||
     event.ctrlKey ||
     event.metaKey ||
     event.altKey ||
@@ -598,7 +690,20 @@ function processFrame(now) {
     values = remoteAudio
     spectrum = remoteSpectrum
     outputConnected.value = now - lastPacket < 3000 && lastPacket > 0
-    if (!outputConnected.value) renderer?.motion.setBoost(false, engineSettings)
+    engineSettings.frozen = outputConnected.value ? remoteFrozen : true
+    if (!outputConnected.value) {
+      renderer?.motion.setBoost(false, engineSettings)
+      values = {
+        bass: 0,
+        mid: 0,
+        high: 0,
+        level: 0,
+        beat: 0,
+        bpm: 0,
+        bpmConfidence: 0,
+        beatId: remoteAudio.beatId,
+      }
+    }
   } else {
     values = audio.update(
       dt,
@@ -622,7 +727,7 @@ function processFrame(now) {
       )
     ) {
       autoTime += dt
-      if (autoTime >= settings.autoInterval)
+      if (shouldAdvanceScene(autoTime, settings.autoInterval, dynamicMix.music))
         selectScene(
           scenes[(scenes.findIndex((scene) => scene.id === settings.scene) + 1) % scenes.length].id,
         )
@@ -657,6 +762,7 @@ function processFrame(now) {
   if (!document.hidden) renderer?.render(dt, values, spectrum)
   if (now - uiTime > 100) {
     prismState.level = settings.prismLevel > 0 ? (settings.prismLevel - 1) / 4 : prismDynamics.level
+    passage.value = dynamicMix.music.phase
     visualMixState.energy = dynamicMix.energy
     Object.assign(visualMixState.values, engineSettings)
     Object.assign(stats, {
@@ -695,11 +801,13 @@ onMounted(() => {
     channel.onmessage = ({ data }) => {
       if (data.type === 'live') {
         Object.assign(engineSettings, data.settings)
+        remoteFrozen = !!data.settings.frozen
         renderer?.motion.restore(data.motion)
         return
       }
       if (data.type !== 'frame') return
       Object.assign(engineSettings, data.settings)
+      remoteFrozen = !!data.settings.frozen
       remoteAudio = data.audio
       remoteSpectrum.set(data.spectrum)
       lastPacket = performance.now()
@@ -732,6 +840,7 @@ onMounted(() => {
       visualMix: {
         enabled: engineSettings.dynamicMix,
         energy: dynamicMix.energy,
+        passage: dynamicMix.music.phase,
         colors: engineSettings.dynamicColors,
         values: Object.fromEntries(
           Object.keys(dynamicControls).map((key) => [key, engineSettings[key]]),
@@ -808,7 +917,7 @@ onBeforeUnmount(() => {
     </div>
     <div v-if="graphicsError" class="graphics-error">{{ graphicsError }}</div>
   </div>
-  <div v-else class="studio">
+  <div v-else class="studio" :class="{ 'focus-mode': focusMode }">
     <header class="topbar">
       <a class="brand" href="/" aria-label="Spectrum, accueil"
         ><span class="brand-mark"><i></i><i></i><i></i><i></i><i></i></span
@@ -949,7 +1058,30 @@ onBeforeUnmount(() => {
             <div class="bpm-row">
               <span class="beat-dot" :style="{ opacity: 0.2 + stats.beat * 0.8 }"></span
               ><strong>{{ stats.bpm || '—' }}</strong
-              ><span>BPM ESTIMÉS</span>
+              ><span>{{ stats.bpmConfidence >= 0.8 ? 'BPM · STABLE' : 'BPM · ESTIMATION' }}</span>
+            </div>
+          </details>
+          <details class="studio-drawer audio-tuning">
+            <summary>Sensibilité du signal</summary>
+            <div class="sliders">
+              <label
+                v-for="control in controls.filter((c) =>
+                  ['sensitivity', 'bassGain'].includes(c.key),
+                )"
+                :key="control.key"
+              >
+                <span
+                  >{{ control.name }}<output>{{ settings[control.key].toFixed(2) }}×</output></span
+                >
+                <input
+                  v-model.number="settings[control.key]"
+                  type="range"
+                  :min="control.min"
+                  :max="control.max"
+                  step=".01"
+                  :aria-label="control.name"
+                />
+              </label>
             </div>
           </details>
           <AudioCalibration
@@ -979,6 +1111,9 @@ onBeforeUnmount(() => {
             >
           </div>
           <div class="preview-meta">
+            <button class="focus-button" :aria-pressed="focusMode" @click="focusMode = !focusMode">
+              {{ focusMode ? 'Afficher les réglages' : 'Mode scène' }}
+            </button>
             <span>{{ stats.width }} × {{ stats.height }}</span
             ><span class="fps" :class="{ low: stats.fps > 0 && stats.fps < 45 }"
               >{{ stats.fps || '—' }} FPS</span
@@ -1084,6 +1219,21 @@ onBeforeUnmount(() => {
             /><span>{{ formatTime(duration) }}</span>
           </div>
         </div>
+        <div class="performance-buttons" aria-label="Commandes de scène">
+          <button
+            :class="{ engaged: settings.frozen }"
+            :aria-pressed="settings.frozen"
+            @click="settings.frozen = !settings.frozen"
+          >
+            Ⅱ Figer <kbd>SPACE</kbd></button
+          ><button
+            :class="{ engaged: settings.blackout }"
+            :aria-pressed="settings.blackout"
+            @click="settings.blackout = !settings.blackout"
+          >
+            ■ Noir <kbd>B</kbd>
+          </button>
+        </div>
         <section class="scenes-panel">
           <div class="scenes-heading">
             <div>
@@ -1097,31 +1247,87 @@ onBeforeUnmount(() => {
               ></span
             ></label>
           </div>
-          <div class="scene-grid">
+          <div class="library-tools">
+            <label class="scene-search"
+              ><span class="sr-only">Rechercher une scène</span
+              ><input
+                v-model="sceneQuery"
+                type="search"
+                placeholder="Rechercher une scène…"
+                aria-label="Rechercher une scène"
+            /></label>
             <button
-              v-for="(scene, sceneIndex) in scenes"
-              :key="scene.id"
-              class="scene-card"
-              :class="{ selected: settings.scene === scene.id }"
-              :aria-pressed="settings.scene === scene.id"
-              :title="scene.tag"
-              @click="selectScene(scene.id)"
+              class="favorites-filter"
+              :aria-pressed="onlyFavorites"
+              @click="onlyFavorites = !onlyFavorites"
             >
-              <div class="scene-art" :class="scene.type">
-                <i></i><i></i><i></i
-                ><span class="scene-index">{{ String(sceneIndex + 1).padStart(2, '0') }}</span
-                ><span v-if="settings.scene === scene.id" class="scene-active">↗</span>
-              </div>
-              <div class="scene-caption">
-                <strong>{{ scene.name }}</strong
-                ><kbd v-if="sceneIndex < 10">{{ (sceneIndex + 1) % 10 }}</kbd>
-              </div>
+              ★ Favoris <span>{{ favorites.length }}</span>
             </button>
           </div>
+          <div class="scene-families" role="group" aria-label="Familles de scènes">
+            <button
+              v-for="family in sceneFamilies"
+              :key="family.key"
+              :aria-pressed="sceneFamily === family.key"
+              @click="sceneFamily = family.key"
+            >
+              {{ family.name }}
+            </button>
+          </div>
+          <p class="library-result" role="status">
+            {{ visibleScenes.length }} scène{{ visibleScenes.length > 1 ? 's' : ''
+            }}<template v-if="sceneQuery || onlyFavorites || sceneFamily !== 'all'">
+              · <button @click="resetSceneFilters">Tout afficher</button></template
+            >
+          </p>
+          <div class="scene-grid">
+            <div v-for="scene in visibleScenes" :key="scene.id" class="scene-tile">
+              <button
+                class="scene-card"
+                :class="{ selected: settings.scene === scene.id }"
+                :aria-pressed="settings.scene === scene.id"
+                :title="scene.tag"
+                @click="selectScene(scene.id)"
+              >
+                <div class="scene-art" :class="scene.type">
+                  <img
+                    :src="`/scenes/scene-${scene.id}.jpg`"
+                    alt=""
+                    loading="lazy"
+                    decoding="async"
+                    @error="$event.target.hidden = true"
+                  />
+                  <i></i><i></i><i></i
+                  ><span class="scene-index">{{
+                    String(scenes.indexOf(scene) + 1).padStart(2, '0')
+                  }}</span
+                  ><span v-if="settings.scene === scene.id" class="scene-active">↗</span>
+                </div>
+                <div class="scene-caption">
+                  <strong>{{ scene.name }}</strong
+                  ><kbd v-if="scenes.indexOf(scene) < 10">{{
+                    (scenes.indexOf(scene) + 1) % 10
+                  }}</kbd>
+                </div>
+              </button>
+              <button
+                class="scene-favorite"
+                :aria-label="`${favorites.includes(scene.id) ? 'Retirer' : 'Ajouter'} ${scene.name} ${favorites.includes(scene.id) ? 'des' : 'aux'} favoris`"
+                :aria-pressed="favorites.includes(scene.id)"
+                @click="toggleFavorite(scene.id)"
+              >
+                {{ favorites.includes(scene.id) ? '★' : '☆' }}
+              </button>
+            </div>
+          </div>
+          <p v-if="!visibleScenes.length" class="library-empty">
+            Aucune scène ne correspond.
+            <button @click="resetSceneFilters">Revenir à la bibliothèque</button>
+          </p>
           <div class="scene-footer">
-            <span>Des transitions fluides, une même énergie.</span
+            <span>Auto-pilote : changement sur une phrase, un drop ou un break.</span
             ><label v-if="settings.auto"
-              >Changer toutes les
+              >Attendre au moins
               <select
                 v-model.number="settings.autoInterval"
                 aria-label="Intervalle du mode automatique"
@@ -1140,8 +1346,8 @@ onBeforeUnmount(() => {
           <span class="eyebrow">04 / MIX VISUEL</span
           ><button
             class="text-button"
-            @click="Object.assign(settings, defaults)"
-            title="Rétablir tous les réglages"
+            @click="resetVisualMix"
+            title="Réinitialiser le mix visuel en conservant la scène et la calibration audio"
           >
             ↺ Réinitialiser
           </button>
@@ -1260,6 +1466,21 @@ onBeforeUnmount(() => {
               aria-label="Activer le mix visuel automatique"
             />
           </label>
+          <div class="mix-profiles" role="group" aria-label="Caractère du mix automatique">
+            <button
+              v-for="profile in mixProfiles"
+              :key="profile.name"
+              :aria-pressed="
+                settings.dynamicMix &&
+                settings.dynamicAmount === profile.amount &&
+                settings.dynamicRelease === profile.release &&
+                settings.dynamicFlash === profile.flash
+              "
+              @click="applyMixProfile(profile)"
+            >
+              {{ profile.name }}
+            </button>
+          </div>
           <template v-if="settings.dynamicMix">
             <p class="motion-hint" v-if="settings.liveMode">
               En pause pendant le mode live : tes commandes gardent la main.
@@ -1273,84 +1494,79 @@ onBeforeUnmount(() => {
                 aria-valuemax="100"
                 :aria-valuenow="Math.round(visualMixState.energy * 100)"
               >
-                <span>{{
-                  settings.frozen
-                    ? 'Figé'
-                    : visualMixState.energy > 0.7
-                      ? 'Ça tape'
-                      : visualMixState.energy > 0.3
-                        ? 'En mouvement'
-                        : 'Calme'
-                }}</span>
+                <span>{{ settings.frozen ? 'Figé' : passageNames[passage] }}</span>
                 <div><i :style="{ width: `${visualMixState.energy * 100}%` }"></i></div>
                 <output>{{ Math.round(visualMixState.energy * 100) }}%</output>
               </div>
-              <div class="sliders">
-                <label
-                  ><span
-                    >Amplitude
-                    <output>{{ Math.round(settings.dynamicAmount * 100) }}%</output></span
-                  >
-                  <input
-                    v-model.number="settings.dynamicAmount"
-                    type="range"
-                    min="0"
-                    max="1"
-                    step="0.01"
-                    aria-label="Amplitude du mix automatique"
-                  />
-                </label>
-                <label
-                  ><span
-                    >Retour au calme
-                    <output>{{ settings.dynamicRelease.toFixed(1) }} s</output></span
-                  >
-                  <input
-                    v-model.number="settings.dynamicRelease"
-                    type="range"
-                    min="0.3"
-                    max="4"
-                    step="0.1"
-                    aria-label="Retour au calme du mix automatique"
-                  />
-                </label>
-              </div>
-              <div class="sliders">
-                <label
-                  ><span
-                    >Flashs auto
-                    <output>{{ Math.round(settings.dynamicFlash * 100) }}%</output></span
-                  >
-                  <input
-                    v-model.number="settings.dynamicFlash"
-                    type="range"
-                    min="0"
-                    max="1"
-                    step="0.01"
-                    aria-label="Dosage des flashs automatiques"
-                  />
-                </label>
-                <label v-if="[1, 32].includes(settings.scene)"
-                  ><span
-                    >Avancée du tunnel
-                    <output>{{ Math.round(settings.tunnelTravel * 100) }}%</output></span
-                  >
-                  <input
-                    v-model.number="settings.tunnelTravel"
-                    type="range"
-                    min="0"
-                    max="1"
-                    step="0.01"
-                    aria-label="Avancée du tunnel"
-                    :disabled="settings.advancedMotion"
-                  />
-                  <small class="motion-hint">{{
-                    settings.advancedMotion
-                      ? 'Pilotée par tes réglages manuels de déplacement.'
-                      : 'Dérive lente et poussées brèves sur les frappes.'
-                  }}</small>
-                </label>
-              </div>
+              <details class="studio-drawer mix-settings">
+                <summary>Réglages du mix auto</summary>
+                <div class="sliders">
+                  <label
+                    ><span
+                      >Amplitude
+                      <output>{{ Math.round(settings.dynamicAmount * 100) }}%</output></span
+                    >
+                    <input
+                      v-model.number="settings.dynamicAmount"
+                      type="range"
+                      min="0"
+                      max="1"
+                      step="0.01"
+                      aria-label="Amplitude du mix automatique"
+                    />
+                  </label>
+                  <label
+                    ><span
+                      >Retour au calme
+                      <output>{{ settings.dynamicRelease.toFixed(1) }} s</output></span
+                    >
+                    <input
+                      v-model.number="settings.dynamicRelease"
+                      type="range"
+                      min="0.3"
+                      max="4"
+                      step="0.1"
+                      aria-label="Retour au calme du mix automatique"
+                    />
+                  </label>
+                </div>
+                <div class="sliders">
+                  <label
+                    ><span
+                      >Flashs auto
+                      <output>{{ Math.round(settings.dynamicFlash * 100) }}%</output></span
+                    >
+                    <input
+                      v-model.number="settings.dynamicFlash"
+                      type="range"
+                      min="0"
+                      max="1"
+                      step="0.01"
+                      aria-label="Dosage des flashs automatiques"
+                    />
+                  </label>
+                  <label v-if="[1, 32].includes(settings.scene)"
+                    ><span
+                      >Avancée du tunnel
+                      <output>{{ Math.round(settings.tunnelTravel * 100) }}%</output></span
+                    >
+                    <input
+                      v-model.number="settings.tunnelTravel"
+                      type="range"
+                      min="0"
+                      max="1"
+                      step="0.01"
+                      aria-label="Avancée du tunnel"
+                      :disabled="settings.advancedMotion"
+                    />
+                    <small class="motion-hint">{{
+                      settings.advancedMotion
+                        ? 'Pilotée par tes réglages manuels de déplacement.'
+                        : 'Dérive lente et poussées brèves sur les frappes.'
+                    }}</small>
+                  </label>
+                </div>
+              </details>
               <label class="rave-toggle"
                 ><input v-model="settings.dynamicColorEnabled" type="checkbox" /> Couleurs
                 auto</label
@@ -1380,7 +1596,7 @@ onBeforeUnmount(() => {
               <p class="motion-hint">
                 Les passages calmes sont plus sombres. Sur les frappes fortes, l’auto pousse le
                 relief, le psychédélisme et les couleurs. Flashs auto à zéro désactive les flashs
-                ajoutés ; tes flashs manuels restent réglables en Mode Rave.
+                ajoutés ; tes flashs manuels restent réglables dans « Sculpter la scène ».
               </p>
             </template>
           </template>
@@ -1409,10 +1625,16 @@ onBeforeUnmount(() => {
             </button>
           </div>
         </div>
+        <p class="scene-direction">{{ directionForScene(settings.scene).note }}</p>
         <div class="render-controls">
+          <div class="section-label">
+            COMPOSITION <span>{{ currentScene.name }}</span>
+          </div>
           <div class="control-group sliders">
             <label
-              v-for="control in controls"
+              v-for="control in controls.filter(
+                (c) => !['sensitivity', 'bassGain'].includes(c.key) && (!c.orbital || isOrbital),
+              )"
               :key="control.key"
               :class="{
                 dimmed: control.orbital && !isOrbital,
@@ -1449,14 +1671,9 @@ onBeforeUnmount(() => {
             >
           </div>
         </div>
-        <p v-if="!isOrbital" class="motion-hint orbital-settings-hint">
-          Les deux réglages Orbital sont réservés à Orbital et Orbital Overdrive. Pour
-          {{ currentScene.name }}, utilise la profondeur et le psychédélisme du Mode Rave
-          ci-dessous.
-        </p>
         <div v-if="settings.scene !== 0" class="control-group motion-controls">
           <div class="section-label">
-            MODE RAVE <span>{{ currentScene.name }}</span>
+            SCULPTER LA SCÈNE <span>{{ currentScene.name }}</span>
           </div>
           <p class="motion-hint">
             La musique fait le travail. Dose simplement l’énergie, le relief et les effets.
@@ -1553,81 +1770,82 @@ onBeforeUnmount(() => {
             </button>
           </div>
         </div>
-        <div class="control-group compact-controls">
-          <label
-            ><span>Transition</span
-            ><select v-model.number="settings.transition">
-              <option :value="0">Cut direct</option>
-              <option :value="0.6">Rapide · 0,6 s</option>
-              <option :value="1.5">Fluide · 1,5 s</option>
-              <option :value="3">Lente · 3 s</option>
-            </select></label
-          ><label
-            ><span>Qualité</span
-            ><select v-model="settings.quality">
-              <option value="auto">Auto · adaptative</option>
-              <option value="eco">Éco · léger</option>
-              <option value="high">Haute · jusqu’à 1080p</option>
-            </select></label
-          >
-        </div>
-        <div class="performance-buttons">
-          <button
-            :class="{ engaged: settings.frozen }"
-            :aria-pressed="settings.frozen"
-            @click="settings.frozen = !settings.frozen"
-          >
-            Ⅱ Figer <kbd>SPACE</kbd></button
-          ><button
-            :class="{ engaged: settings.blackout }"
-            :aria-pressed="settings.blackout"
-            @click="settings.blackout = !settings.blackout"
-          >
-            ■ Noir <kbd>B</kbd>
-          </button>
-        </div>
-        <div class="presets control-group">
-          <div class="section-label">
-            MES PRESETS <span>{{ savedPresets.length.toString().padStart(2, '0') }}</span>
-          </div>
-          <div v-if="savedPresets.length" class="preset-row">
-            <select v-model="presetSelection" aria-label="Charger un preset" @change="applyPreset">
-              <option value="" disabled>Choisir un preset</option>
-              <option v-for="preset in savedPresets" :key="preset.name" :value="preset.name">
-                {{ preset.name }}
-              </option></select
-            ><button
-              class="icon-button"
-              :disabled="!presetSelection"
-              @click="removePreset"
-              aria-label="Supprimer le preset sélectionné"
+        <details class="studio-drawer output-settings">
+          <summary>Transitions et qualité</summary>
+          <div class="control-group compact-controls">
+            <label
+              ><span>Transition</span
+              ><select v-model.number="settings.transition">
+                <option :value="0">Cut direct</option>
+                <option :value="0.6">Rapide · 0,6 s</option>
+                <option :value="1.5">Fluide · 1,5 s</option>
+                <option :value="3">Lente · 3 s</option>
+              </select></label
+            ><label
+              ><span>Qualité</span
+              ><select v-model="settings.quality">
+                <option value="auto">Auto · adaptative</option>
+                <option value="eco">Éco · léger</option>
+                <option value="high">Haute · jusqu’à 1080p</option>
+              </select></label
+            ><label
+              ><span>Passage visuel</span
+              ><select v-model="settings.transitionStyle" aria-label="Style de transition">
+                <option value="breathe">Ouverture progressive</option>
+                <option value="fade">Fondu simple</option>
+              </select></label
             >
-              ×
-            </button>
           </div>
-          <form class="preset-row" @submit.prevent="savePreset">
+        </details>
+        <details class="studio-drawer preset-drawer">
+          <summary>Mes presets · {{ savedPresets.length }}</summary>
+          <div class="presets control-group">
+            <div class="section-label">
+              MES PRESETS <span>{{ savedPresets.length.toString().padStart(2, '0') }}</span>
+            </div>
+            <div v-if="savedPresets.length" class="preset-row">
+              <select
+                v-model="presetSelection"
+                aria-label="Charger un preset"
+                @change="applyPreset"
+              >
+                <option value="" disabled>Choisir un preset</option>
+                <option v-for="preset in savedPresets" :key="preset.name" :value="preset.name">
+                  {{ preset.name }}
+                </option></select
+              ><button
+                class="icon-button"
+                :disabled="!presetSelection"
+                @click="removePreset"
+                aria-label="Supprimer le preset sélectionné"
+              >
+                ×
+              </button>
+            </div>
+            <form class="preset-row" @submit.prevent="savePreset">
+              <input
+                v-model="presetName"
+                aria-label="Nom du preset"
+                placeholder="Nom du preset…"
+                maxlength="40"
+              /><button class="save-preset" type="submit" aria-label="Enregistrer le preset">
+                ＋
+              </button>
+            </form>
+            <div class="preset-links">
+              <button @click="exportPreset">↓ Exporter</button
+              ><button @click="presetInput.click()">↑ Importer</button>
+            </div>
             <input
-              v-model="presetName"
-              aria-label="Nom du preset"
-              placeholder="Nom du preset…"
-              maxlength="40"
-            /><button class="save-preset" type="submit" aria-label="Enregistrer le preset">
-              ＋
-            </button>
-          </form>
-          <div class="preset-links">
-            <button @click="exportPreset">↓ Exporter</button
-            ><button @click="presetInput.click()">↑ Importer</button>
+              ref="presetInput"
+              type="file"
+              accept="application/json,.json"
+              class="sr-only"
+              tabindex="-1"
+              @change="importPreset"
+            />
           </div>
-          <input
-            ref="presetInput"
-            type="file"
-            accept="application/json,.json"
-            class="sr-only"
-            tabindex="-1"
-            @change="importPreset"
-          />
-        </div>
+        </details>
       </aside>
     </main>
     <footer class="statusbar">

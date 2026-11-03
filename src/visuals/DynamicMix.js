@@ -1,3 +1,4 @@
+import { MusicalForm } from './MusicalForm.js'
 import { dynamicPalette } from './dynamicColors.js'
 const clamp = (value, min = 0, max = 1) => Math.min(max, Math.max(min, value))
 // Multipliers at silence and at full musical energy, followed by render limits.
@@ -13,6 +14,7 @@ export const dynamicControls = {
   ravePsy: [0.05, 3.0, 0, 2],
   raveFlash: [0, 1, 0, 1],
 }
+const controlEntries = Object.entries(dynamicControls)
 const peakTargets = {
   intensity: 1.7,
   glow: 0.9,
@@ -24,12 +26,22 @@ const peakTargets = {
 }
 export class DynamicMix {
   constructor() {
+    this.music = new MusicalForm()
     this.energy = 0
     this.impact = 0
     this.peak = 0.35
+    this.paletteKey = null
+    this.palette = null
     this.output = {}
   }
+  reset() {
+    this.music.reset()
+    this.energy = this.impact = 0
+    this.peak = 0.35
+    this.paletteKey = null
+  }
   update(dt, audio, base) {
+    this.music.update(dt, audio, base.frozen, base.dynamicRelease ?? 1.6)
     Object.assign(this.output, base)
     this.output.dynamicColors = null
     this.output.dynamicStrength = 0
@@ -47,15 +59,13 @@ export class DynamicMix {
       // A minimum reference prevents silence or a quiet passage becoming a climax.
       this.peak = Math.max(0.35, raw, this.peak * Math.exp(-dt / 8))
       const presence = clamp(raw / 0.12)
-      const target = clamp((raw / this.peak) * 0.8 + value('beat') * 0.25 * presence) * presence
       this.impact = Math.max(value('beat') * presence, this.impact * Math.exp(-dt * 9))
-      const response = target > this.energy ? 0.12 : (base.dynamicRelease ?? 1.6)
-      this.energy += (target - this.energy) * (1 - Math.exp(-dt / response))
+      this.energy = this.music.energy
     }
     const amount = clamp(base.dynamicAmount ?? 0.75)
-    const drive = clamp(this.energy * 0.75 + this.impact * 0.25)
+    const drive = clamp(this.energy * 0.85 + this.impact * 0.15)
     this.output.dynamicStrength = amount
-    for (const [key, [quiet, loud, min, max]] of Object.entries(dynamicControls)) {
+    for (const [key, [quiet, loud, min, max]] of controlEntries) {
       if (!Number.isFinite(base[key])) continue
       const peak = Math.max(base[key] * loud, peakTargets[key] ?? 0)
       const target = base[key] * quiet * (1 - drive) + peak * drive
@@ -66,12 +76,17 @@ export class DynamicMix {
       base.raveFlash * (1 - amount + amount * hot) + (base.dynamicFlash ?? 0.45) * amount * hot,
     )
     if (base.dynamicColorEnabled !== false && amount > 0) {
-      const colorEnergy = clamp((this.energy - 0.15) / 0.7)
-      this.output.dynamicColors = dynamicPalette(
-        base.dynamicCalmColor ?? '#385b9f',
-        base.dynamicHotColor ?? '#ff167a',
-        colorEnergy,
-      )
+      const colorEnergy = this.music.color
+      // Reuse perceptually identical colours instead of parsing three hex strings every frame.
+      const step = Math.round(colorEnergy * 256) / 256
+      const calm = base.dynamicCalmColor ?? '#385b9f'
+      const hotColor = base.dynamicHotColor ?? '#ff167a'
+      const key = `${calm}:${hotColor}:${step}`
+      if (key !== this.paletteKey) {
+        this.palette = dynamicPalette(calm, hotColor, step)
+        this.paletteKey = key
+      }
+      this.output.dynamicColors = this.palette
     }
     return this.output
   }

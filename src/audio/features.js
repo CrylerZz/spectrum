@@ -1,3 +1,4 @@
+import { TempoTracker, bandEnvelope } from './TempoTracker.js'
 import { audioBands, calibrationDefaults, cleanCalibration } from './calibration.js'
 
 const BAND_KEYS = ['bass', 'mid', 'high']
@@ -15,7 +16,16 @@ export class Features {
     this.calibration = null
     this.bands = []
     this.configure(calibrationDefaults)
-    this.values = { bass: 0, mid: 0, high: 0, level: 0, beat: 0, bpm: 0, beatId: 0 }
+    this.values = {
+      bass: 0,
+      mid: 0,
+      high: 0,
+      level: 0,
+      beat: 0,
+      bpm: 0,
+      bpmConfidence: 0,
+      beatId: 0,
+    }
     this.spectrum = new Uint8Array(64)
     this.ranges = Array.from({ length: 64 }, (_, i) => [
       Math.max(1, Math.floor((25 * (16000 / 25) ** (i / 64) * fftSize) / sampleRate)),
@@ -28,7 +38,8 @@ export class Features {
     this.fluxFloor = 0
     this.previousBandEnergy = 0
     this.lastBeat = -10
-    this.intervals = []
+    this.tempo = new TempoTracker()
+    this.previousEnvelope = 0
   }
   configure(input) {
     if (
@@ -66,9 +77,6 @@ export class Features {
     const detectorKeys = [
       'beatSource',
       `${next.beatSource}Enabled`,
-      'beatSensitivity',
-      'beatFloor',
-      'beatInterval',
       `${next.beatSource}LowHz`,
       `${next.beatSource}HighHz`,
     ]
@@ -76,8 +84,9 @@ export class Features {
       this.previousMagnitudes.fill(0)
       this.fluxFloor = 0
       this.lastBeat = -10
-      this.intervals.length = 0
-      this.values.beat = this.values.bpm = 0
+      this.tempo.reset()
+      this.previousEnvelope = 0
+      this.values.beat = this.values.bpm = this.values.bpmConfidence = 0
       this.primeDetector = true
     }
   }
@@ -139,33 +148,38 @@ export class Features {
       Math.max(0.00005, (this.previousBandEnergy * 0.08) / c.beatSensitivity)
     this.previousBandEnergy = bass
     // Detect attacks in the selected band, independently of visual gains.
+    const envelope = decibels
+      ? 0
+      : bandEnvelope(
+          waveform,
+          this.sampleRate,
+          c[`${c.beatSource}LowHz`],
+          c[`${c.beatSource}HighHz`],
+        )
+    const temporalOnset =
+      !decibels &&
+      envelope > 0.015 &&
+      envelope > this.previousEnvelope * 1.6 &&
+      envelope - this.previousEnvelope > 0.008
+    this.previousEnvelope = envelope
     const onset =
       c[`${c.beatSource}Enabled`] &&
       !this.primeDetector &&
-      risingEnergy &&
       bass > 10 ** (c.beatFloor / 20) &&
-      flux > Math.max(2.1, this.fluxFloor * 1.65) / c.beatSensitivity
+      ((risingEnergy && flux > Math.max(2.1, this.fluxFloor * 1.65) / c.beatSensitivity) ||
+        temporalOnset)
     this.primeDetector = false
     this.fluxFloor += (flux - this.fluxFloor) * (1 - Math.exp(-dt * 2))
     this.values.beat *= Math.exp(-dt * 9)
     if (onset && time - this.lastBeat > c.beatInterval / 1000) {
-      const interval = time - this.lastBeat
-      if (interval > 0.25 && interval < 1) {
-        this.intervals.push(interval)
-        if (this.intervals.length > 12) this.intervals.shift()
-        if (this.intervals.length >= 4) {
-          const sorted = [...this.intervals].sort((a, b) => a - b)
-          this.values.bpm = Math.round(60 / sorted[Math.floor(sorted.length / 2)])
-        }
-      }
+      this.tempo.hit(time)
       this.lastBeat = time
       this.values.beat = 1
       this.values.beatId++
     }
-    if (time - this.lastBeat > 3) {
-      this.values.bpm = 0
-      this.intervals.length = 0
-    }
+    this.tempo.update(time)
+    this.values.bpm = this.tempo.bpm
+    this.values.bpmConfidence = this.tempo.confidence
     for (let j = 0; j < 64; j++) {
       const [lo, hi] = this.ranges[j]
       let max = 0

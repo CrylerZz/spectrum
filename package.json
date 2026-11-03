@@ -9,6 +9,9 @@
     "preview": "vite preview --host 127.0.0.1",
     "test": "node --test tests/*.test.js",
     "test:browser": "node tests/browser.cjs",
+    "test:render": "node tests/orbital.cjs --art-review",
+    "test:soak": "node tests/orbital.cjs --soak",
+    "render:covers": "node tests/orbital.cjs --covers",
     "format": "prettier --write src tests index.html vite.config.js package.json README.md"
   },
   "dependencies": {
